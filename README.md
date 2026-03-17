@@ -1,18 +1,18 @@
 # Battery Strategy Multi-Agent
 
-LG Energy Solution vs CATL portfolio diversification strategy analysis using a supervisor-based multi-agent workflow.
+LG에너지솔루션과 CATL의 포트폴리오 다각화 전략을 비교 분석하기 위한 Supervisor 기반 멀티에이전트 프로젝트입니다.
 
 ## Overview
-- Objective: Compare LG Energy Solution and CATL under the EV downturn and derive evidence-based strategic insights.
-- Method: Agentic RAG with company-separated analysis paths, structured comparison, and review.
+- Objective: EV 캐즘 환경에서 LG에너지솔루션과 CATL의 전략 차이를 근거 기반으로 비교 분석
+- Method: Agentic RAG, 기업별 분석 경로 분리, 구조화 출력, 비교/검토 단계 분리
 - Tools: LangGraph, LangChain, Python, FAISS, multilingual-e5-large
 
 ## Features
-- Market context analysis from curated official documents
-- Separate analysis paths for LG Energy Solution and CATL
-- Structured comparison, SWOT, and evidence-based scorecard
-- Bias-aware validation using limited web verification
-- Evidence traceability for key claims and conclusions
+- 공식 문서 기반 시장 배경 분석
+- LGES / CATL 분리 분석으로 문맥 오염 방지
+- 비교표, SWOT, scorecard 생성
+- 편향 보정 및 교차 검증 중심의 제한적 웹 검증
+- 핵심 주장별 근거 추적
 
 ## Tech Stack
 
@@ -22,26 +22,46 @@ LG Energy Solution vs CATL portfolio diversification strategy analysis using a s
 | Retrieval | FAISS |
 | Embedding | intfloat/multilingual-e5-large |
 | Pattern | Supervisor-based Multi-Agent Workflow |
-| Output | Markdown report, PDF export |
+| Output | Markdown 보고서, PDF 변환 |
 
 ## Agents
-- Supervisor Agent: Controls routing and retry decisions
-- Market Research Agent: Summarizes market context
-- LGES Analysis Agent: Analyzes LG Energy Solution strategy
-- CATL Analysis Agent: Analyzes CATL strategy
-- Comparison Agent: Builds comparison matrix, SWOT, and scorecard
-- Review Agent: Checks evidence quality, consistency, and bias
+- Supervisor Agent: 흐름 제어, 재시도 판단, 다음 단계 라우팅
+- Market Research Agent: 시장 배경 요약
+- LGES Analysis Agent: LG에너지솔루션 전략 분석
+- CATL Analysis Agent: CATL 전략 분석
+- Comparison Agent: 비교표, SWOT, scorecard 생성
+- Review Agent: 근거성, 일관성, 편향 검토
 
 ## Architecture
-See [docs/design.md](./docs/design.md).
+- 설계 문서: [docs/design.md](./docs/design.md)
+- 그래프 정의: [graph.py](./graph.py)
+- 상태 정의: [state.py](./state.py)
 
 ## Directory Structure
 ```text
 .
 ├── README.md
-└── docs
-    └── design.md
+├── app.py
+├── graph.py
+├── state.py
+├── requirements.txt
+├── agents
+│   ├── __init__.py
+│   ├── supervisor.py
+│   ├── market_research.py
+│   ├── lges_analysis.py
+│   ├── catl_analysis.py
+│   ├── comparison.py
+│   └── review.py
+├── data
+├── docs
+│   └── design.md
+├── outputs
+├── prompts
+│   └── __init__.py
+└── tools
+    └── __init__.py
 ```
 
 ## Contributors
-- 양정우: Agent design, workflow design, report structure
+- 양정우: Agent 설계, 워크플로우 설계, 보고서 구조 설계
