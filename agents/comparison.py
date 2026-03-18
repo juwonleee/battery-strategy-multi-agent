@@ -1,45 +1,100 @@
-from state import AgentState, ComparisonRow, Scorecard, SwotEntry
+from prompts import build_comparison_prompt
+from state import AgentState, ComparisonOutput, EvidenceRef, SwotEntry
+from tools.openai_client import StructuredOutputError, invoke_structured_output
+from tools.retrieval import load_retriever
 
 
 def comparison_agent(state: AgentState) -> AgentState:
-    """Placeholder comparison agent."""
-    comparison = [
-        ComparisonRow(
-            strategy_axis="Portfolio diversification",
-            lges_value="ESS and advanced form factors",
-            catl_value="ESS, sodium-ion, ecosystem expansion",
-            difference="CATL is broader in adjacent ecosystem plays",
-            implication="LGES is more focused, CATL is broader",
-            evidence_refs=[],
+    """Generate evidence-backed comparison outputs from the two company profiles."""
+    config = state["config"]
+    retriever = load_retriever(config)
+    comparison_evidence_refs = _retrieve_comparison_evidence(state, retriever)
+    prompt = build_comparison_prompt(
+        goal=state["goal"],
+        market_context=state["market_context"],
+        lges_profile=state["lges_profile"],
+        catl_profile=state["catl_profile"],
+        comparison_evidence_refs=comparison_evidence_refs,
+    )
+
+    try:
+        output = invoke_structured_output(
+            config=config,
+            prompt=prompt,
+            response_model=ComparisonOutput,
+            max_output_tokens=max(config.openai_max_output_tokens, 4000),
         )
-    ]
-    swot = [
-        SwotEntry(company_name="LG Energy Solution"),
-        SwotEntry(company_name="CATL"),
-    ]
-    scorecard = [
-        Scorecard(
-            company_name="LG Energy Solution",
-            diversification_strength=3,
-            cost_competitiveness=3,
-            market_adaptability=4,
-            risk_exposure=3,
-            score_rationale="초안",
-            evidence_refs=[],
-        ),
-        Scorecard(
-            company_name="CATL",
-            diversification_strength=4,
-            cost_competitiveness=5,
-            market_adaptability=4,
-            risk_exposure=3,
-            score_rationale="초안",
-            evidence_refs=[],
-        ),
-    ]
+    except StructuredOutputError as exc:
+        return {
+            "status": "failed",
+            "last_error": str(exc),
+        }
+
+    validation_error = _validate_comparison_output(output)
+    if validation_error is not None:
+        return {
+            "status": "failed",
+            "last_error": validation_error,
+        }
+
     return {
-        "comparison_matrix": comparison,
-        "swot_matrix": swot,
-        "scorecard": scorecard,
+        "comparison_matrix": output.comparison_matrix,
+        "swot_matrix": output.swot_matrix,
+        "scorecard": output.scorecard,
+        "low_confidence_claims": output.low_confidence_claims,
+        "citation_refs": list(state.get("citation_refs", [])) + comparison_evidence_refs,
         "status": "running",
+        "last_error": None,
     }
+
+
+def _retrieve_comparison_evidence(state: AgentState, retriever) -> list[EvidenceRef]:
+    queries = [
+        "Compare LGES and CATL diversification strategy ESS LFP sodium-ion regional expansion",
+        "LGES CATL cost competitiveness market adaptability risk exposure battery strategy comparison",
+        "Battery industry comparison LGES CATL customer mix supply chain policy and pricing pressure",
+    ]
+    evidence_map: dict[str, EvidenceRef] = {}
+    for query in queries:
+        for hit in retriever.retrieve(query, scope="cross_check", top_k=6):
+            if hit.chunk_id:
+                evidence_map[hit.chunk_id] = hit
+    return list(evidence_map.values())
+
+
+def _validate_comparison_output(output: ComparisonOutput) -> str | None:
+    if not output.comparison_matrix:
+        return "Comparison output is missing comparison rows."
+    if len(output.swot_matrix) != 2:
+        return "Comparison output must include exactly two SWOT entries."
+    if len(output.scorecard) != 2:
+        return "Comparison output must include exactly two scorecards."
+
+    for row in output.comparison_matrix:
+        if not row.evidence_refs:
+            return f"Comparison row '{row.strategy_axis}' is missing evidence references."
+
+    for entry in output.swot_matrix:
+        if not _has_any_swot_content(entry):
+            return f"SWOT entry for '{entry.company_name}' is empty."
+        if not entry.evidence_refs:
+            return f"SWOT entry for '{entry.company_name}' is missing evidence references."
+
+    for card in output.scorecard:
+        if not card.score_rationale.strip():
+            return f"Scorecard for '{card.company_name}' is missing rationale."
+        if not card.evidence_refs:
+            return f"Scorecard for '{card.company_name}' is missing evidence references."
+
+    return None
+
+
+def _has_any_swot_content(entry: SwotEntry) -> bool:
+    return any(
+        [
+            entry.strengths,
+            entry.weaknesses,
+            entry.opportunities,
+            entry.threats,
+        ]
+    )

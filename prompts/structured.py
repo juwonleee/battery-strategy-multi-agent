@@ -27,6 +27,7 @@ You are generating structured analysis for a battery strategy comparison workflo
 - Use only the provided evidence snippets and context.
 - If the evidence is insufficient, state "정보 부족" instead of guessing.
 - Every substantive conclusion must map to the exact evidence references provided.
+- When returning EvidenceRef objects, keep them minimal: prefer document_id, chunk_id, and page only.
 - Do not invent sources, pages, chunk IDs, or numerical values.
 - Keep the response concise and decision-oriented.
 """.strip()
@@ -97,20 +98,30 @@ def build_comparison_prompt(
     market_context: MarketContext,
     lges_profile: CompanyProfile,
     catl_profile: CompanyProfile,
+    comparison_evidence_refs: list[EvidenceRef],
 ) -> PromptBundle:
     payload = {
         "goal": goal,
         "market_context": market_context.model_dump(mode="json"),
         "lges_profile": lges_profile.model_dump(mode="json"),
         "catl_profile": catl_profile.model_dump(mode="json"),
+        "comparison_evidence": [
+            item.model_dump(mode="json") for item in comparison_evidence_refs
+        ],
     }
     return PromptBundle(
         name="comparison",
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
+                "Return a ComparisonOutput object.",
                 "Compare the two company profiles using the same axes and evidence references.",
-                "Produce comparison-ready reasoning that can later be mapped into comparison rows, SWOT entries, and scorecards.",
+                "Produce 3 to 5 comparison rows with short axis labels and concise implications.",
+                "Produce exactly 2 SWOT entries, one for LG Energy Solution and one for CATL.",
+                "Produce exactly 2 scorecards, one for LG Energy Solution and one for CATL.",
+                "Limit SWOT lists to at most 3 items per section and use 1 to 3 evidence refs per row or scorecard.",
+                "Each score must be 1 to 5 or null, and every scorecard must include a non-empty rationale and evidence refs.",
+                "If evidence is weak or incomplete, add a ClaimTrace item to low_confidence_claims instead of guessing.",
             ]
         ),
         input_text=json.dumps(payload, ensure_ascii=False, indent=2),

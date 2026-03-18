@@ -164,6 +164,13 @@ class ClaimTrace(BaseModel):
     confidence_level: Literal["high", "medium", "low"]
 
 
+class ComparisonOutput(BaseModel):
+    comparison_matrix: list[ComparisonRow] = Field(default_factory=list)
+    swot_matrix: list[SwotEntry] = Field(default_factory=list)
+    scorecard: list[Scorecard] = Field(default_factory=list)
+    low_confidence_claims: list[ClaimTrace] = Field(default_factory=list)
+
+
 class ReviewResult(BaseModel):
     passed: bool
     revision_target: RevisionTarget | None = None

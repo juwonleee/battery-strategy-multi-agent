@@ -34,15 +34,21 @@ def invoke_structured_output(
     config: AppConfig,
     prompt: PromptBundle,
     response_model: type[T],
+    max_output_tokens: int | None = None,
 ) -> T:
     client = create_openai_client(config)
-    response = client.responses.parse(
-        model=config.openai_model,
-        instructions=prompt.instructions,
-        input=prompt.input_text,
-        text_format=response_model,
-        max_output_tokens=config.openai_max_output_tokens,
-    )
+    try:
+        response = client.responses.parse(
+            model=config.openai_model,
+            instructions=prompt.instructions,
+            input=prompt.input_text,
+            text_format=response_model,
+            max_output_tokens=max_output_tokens or config.openai_max_output_tokens,
+        )
+    except Exception as exc:
+        raise StructuredOutputError(
+            f"Structured output call failed for prompt '{prompt.name}': {exc}"
+        ) from exc
     parsed = getattr(response, "output_parsed", None)
     if parsed is None:
         raise StructuredOutputError(
