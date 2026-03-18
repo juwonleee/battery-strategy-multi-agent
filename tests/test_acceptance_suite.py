@@ -21,13 +21,17 @@ def test_minimal_report_spec_fixture_matches_submission_shape(sample_state):
     html = assemble_html_report(state)
 
     assert "## Executive Summary" in markdown
+    assert "## 비교 프레임과 방법" in markdown
     assert "## 직접 비교표" in markdown
+    assert "## 참고 지표표" in markdown
     assert "## 차트와 해석" in markdown
+    assert "## SWOT" in markdown
+    assert "## Scorecard" in markdown
     assert "## 종합 판단" in markdown
-    assert "CATL은 포트폴리오 선택지가 더 넓고" in markdown
     assert "Quick Comparison" in markdown
     assert "Revenue Comparison" in html
     assert "Sample Market Report" in html
+    assert "Reference" in html
 
 
 def test_full_workflow_e2e_runs_through_graph_and_exports_reports(

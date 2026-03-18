@@ -111,6 +111,35 @@ def test_structured_comparison_output_fails_without_supporting_claim_ids(sample_
     assert "without supporting_claim_ids" in error
 
 
+def test_build_comparison_input_spec_falls_back_to_non_empty_source_label(sample_state):
+    state = _state_with_first_pass_claims(sample_state)
+    state["document_manifest"] = [
+        DocumentRef(
+            document_id="market-001",
+            title="",
+            source_path="data/raw/sample-market.pdf",
+            company_scope="market",
+        ),
+        DocumentRef(
+            document_id="lges-001",
+            title="",
+            source_path="data/raw/sample-lges.pdf",
+            company_scope="lges",
+        ),
+        DocumentRef(
+            document_id="catl-001",
+            title="",
+            source_path="data/raw/sample-catl.pdf",
+            company_scope="catl",
+        ),
+    ]
+
+    input_spec = build_comparison_input_spec(state)
+
+    assert all(claim.source_label for claim in input_spec.lges_catalog.claims)
+    assert all(claim.source_label for claim in input_spec.catl_catalog.claims)
+
+
 def _state_with_first_pass_claims(sample_state):
     state = deepcopy(sample_state)
     market_ref = _ref("market-001", "market-001-p001-c01", 1)

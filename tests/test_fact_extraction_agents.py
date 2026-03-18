@@ -12,6 +12,7 @@ from state import (
     MarketFactExtractionOutput,
     MetricFactClaim,
 )
+from tools.openai_client import StructuredOutputError
 
 
 class _FakeRetriever:
@@ -66,7 +67,7 @@ def test_market_research_agent_emits_fact_packet_and_compatibility_context(
     assert result["market_context"].comparison_axes == ["지역 생산 대응력"]
 
 
-def test_lges_analysis_agent_fails_when_required_metric_family_missing(
+def test_lges_analysis_agent_recovers_when_required_metric_family_missing(
     monkeypatch,
     sample_state,
 ):
@@ -130,11 +131,11 @@ def test_lges_analysis_agent_fails_when_required_metric_family_missing(
 
     result = lges_analysis_agent(sample_state)
 
-    assert result["status"] == "failed"
-    assert "secured_order_volume" in result["last_error"]
+    assert result["status"] == "running"
+    assert "secured_order_volume" in result["lges_facts"].metric_families()
 
 
-def test_catl_analysis_agent_fails_when_required_raw_metric_family_missing(
+def test_catl_analysis_agent_recovers_when_required_raw_metric_family_missing(
     monkeypatch,
     sample_state,
 ):
@@ -206,8 +207,8 @@ def test_catl_analysis_agent_fails_when_required_raw_metric_family_missing(
 
     result = catl_analysis_agent(sample_state)
 
-    assert result["status"] == "failed"
-    assert "profit_for_the_year" in result["last_error"]
+    assert result["status"] == "running"
+    assert "profit_for_the_year" in result["catl_facts"].metric_families()
 
 
 @pytest.mark.parametrize(
@@ -452,6 +453,148 @@ def test_catl_analysis_agent_surfaces_hard_gate_failure(monkeypatch, sample_stat
 
     assert result["status"] == "failed"
     assert result["last_error"].startswith("[hard-gate:fact-claim-evidence]")
+
+
+def test_lges_analysis_agent_uses_fallback_when_structured_output_fails(
+    monkeypatch,
+    sample_state,
+):
+    evidence_refs = [
+        EvidenceRef(
+            document_id="lges-25q4-performance",
+            chunk_id="lges-25q4-performance-p001-c01",
+            page=1,
+            snippet=(
+                "•【 46 Series 】 Start of production in Ochang, customer expansion toward "
+                "traditional OEMs and Chinese OEMs, achieving 300GWh+ of order backlog "
+                "•【 ESS 】 Securing order backlog of 140GWh"
+            ),
+        ),
+        EvidenceRef(
+            document_id="lges-25q4-performance",
+            chunk_id="lges-25q4-performance-p007-c01",
+            page=7,
+            snippet=(
+                "GlobalESS Capacity 2025-end 12GWh 2026-end 36GWh +More than 60GWh "
+                "NorthAmerica ... Japan and Australia ... LFP and HV Mid-Ni ... 46 Series"
+            ),
+        ),
+        EvidenceRef(
+            document_id="lges-25q4-performance",
+            chunk_id="lges-25q4-performance-p008-c01",
+            page=8,
+            snippet=(
+                "Target to grow between +Mid-teen ~ +20% YoY of Revenue "
+                "Target for +Mid-single% of OP Margin "
+                "Target to reduce Capex by more than -40% YoY "
+                "slowing EV demand in NA"
+            ),
+        ),
+    ]
+
+    monkeypatch.setattr(
+        "agents.lges_analysis._load_retriever",
+        lambda _config: _FakeRetriever(evidence_refs),
+    )
+    monkeypatch.setattr(
+        "agents.lges_analysis.invoke_structured_output",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            StructuredOutputError("forced LGES structured output failure")
+        ),
+    )
+
+    result = lges_analysis_agent(sample_state)
+
+    assert result["status"] == "running"
+    assert result["lges_facts"].metric_families() == {
+        "revenue_growth_guidance",
+        "operating_margin_guidance_or_actual",
+        "capex",
+        "ess_capacity",
+        "secured_order_volume",
+    }
+
+
+def test_catl_analysis_agent_uses_fallback_when_structured_output_fails(
+    monkeypatch,
+    sample_state,
+):
+    evidence_refs = [
+        EvidenceRef(
+            document_id="catl-prospectus",
+            chunk_id="catl-prospectus-p004-c02",
+            page=4,
+            snippet=(
+                "our revenue was RMB328.6 billion, RMB400.9 billion and RMB362.0 billion "
+                "profit for the year was RMB33.5 billion, RMB47.3 billion and RMB55.3 billion "
+                "net profit margin for the years ended December 31, 2022, 2023 and 2024 "
+                "was 10.2%, 11.8% and 15.3%, respectively. "
+                "weighted average ROE was 24.7%, 24.3% and 24.7%, respectively. "
+                "net cash flow generated from operating activities ... RMB97.0 billion."
+            ),
+        ),
+        EvidenceRef(
+            document_id="catl-prospectus",
+            chunk_id="catl-prospectus-p011-c01",
+            page=11,
+            snippet=(
+                "Net cash generated from operating activities 61,208,844 92,826,125 96,990,344 "
+                "Net profit margin 10.2% 11.8% 15.3% "
+                "Weighted average return on equity (ROE) 24.7% 24.3% 24.7%"
+            ),
+        ),
+        EvidenceRef(
+            document_id="catl-prospectus",
+            chunk_id="catl-prospectus-p046-c02",
+            page=46,
+            snippet=(
+                "globally leading innovative new energy technology company "
+                "EV batteries and ESS batteries "
+                "integrated innovative solutions"
+            ),
+        ),
+        EvidenceRef(
+            document_id="catl-prospectus",
+            chunk_id="catl-prospectus-p047-c01",
+            page=47,
+            snippet="Germany Hungary Spain Indonesia",
+        ),
+        EvidenceRef(
+            document_id="catl-prospectus",
+            chunk_id="catl-prospectus-p045-c02",
+            page=45,
+            snippet="additional tariffs average selling price raw materials",
+        ),
+        EvidenceRef(
+            document_id="catl-prospectus",
+            chunk_id="catl-prospectus-p007-c01",
+            page=7,
+            snippet="Revenue 328,593,988 400,917,045 362,012,554 Gross profit 57,964,208 76,934,915 88,493,595",
+        ),
+    ]
+
+    monkeypatch.setattr(
+        "agents.catl_analysis._load_retriever",
+        lambda _config: _FakeRetriever(evidence_refs),
+    )
+    monkeypatch.setattr(
+        "agents.catl_analysis.invoke_structured_output",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            StructuredOutputError("forced CATL structured output failure")
+        ),
+    )
+
+    result = catl_analysis_agent(sample_state)
+
+    assert result["status"] == "running"
+    assert result["catl_facts"].metric_families() == {
+        "revenue",
+        "profit_for_the_year",
+        "gross_profit_margin",
+        "net_profit_margin",
+        "roe",
+        "operating_cash_flow",
+    }
 
 
 def _metric_claim_payload(

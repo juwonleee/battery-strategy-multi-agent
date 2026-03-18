@@ -1,0 +1,134 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="Claude" version="21.0.0" type="device">
+  <diagram name="End-to-End Workflow" id="end-to-end">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="End-to-End Workflow — Agentic RAG Battery Strategy Evaluator" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="1200" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- START -->
+        <mxCell id="start" value="app.py start" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="80" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Preprocessing -->
+        <mxCell id="pre" value="Document Preprocessing&#xa;PDF → chunks (1200자, overlap 200)&#xa;→ FAISS index (multilingual-e5-large)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="660" y="160" width="280" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- build_initial_state -->
+        <mxCell id="init" value="build_initial_state&#xa;RetryBudget · AgentState 초기화" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="260" width="240" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- LOOP container -->
+        <mxCell id="loop_bg" value="" style="swimlane;startSize=0;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;rounded=1;arcSize=3;" vertex="1" parent="1">
+          <mxGeometry x="80" y="340" width="1440" height="620" as="geometry" />
+        </mxCell>
+        <mxCell id="loop_label" value="🔁  run_once loop  ·  max 20 iterations  (graph.py)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="100" y="345" width="500" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- supervisor_agent -->
+        <mxCell id="sup" value="🧠 supervisor_agent&#xa;AgentState 전체 검사 → 우선순위 라우팅&#xa;(agents/supervisor.py)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="380" width="240" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 1: Blueprint -->
+        <mxCell id="sbp" value="① supervisor_blueprint&#xa;비교 축 4개 고정&#xa;worker contract 정의&#xa;→ report_blueprint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="390" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 2: Workers -->
+        <mxCell id="mr" value="② market_research&#xa;scope=market retrieval&#xa;→ market_facts&#xa;market_context" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="510" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="la" value="③ lges_analysis&#xa;scope=lges retrieval&#xa;→ lges_facts · lges_profile&#xa;lges_normalized_metrics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="620" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ca" value="④ catl_analysis&#xa;scope=catl retrieval&#xa;→ catl_facts · catl_profile&#xa;catl_normalized_metrics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="730" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 3: Comparison -->
+        <mxCell id="cmp" value="⑤ comparison&#xa;claim catalog만 사용 (새 retrieval 없음)&#xa;→ synthesis_claims · score_criteria&#xa;metric_comparison_rows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="680" y="520" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 4: Supervisor Synthesis -->
+        <mxCell id="ss" value="⑥ supervisor_synthesis&#xa;최종 보고서 섹션 직접 작성&#xa;→ executive_summary · supervisor_swot&#xa;final_judgment · implications" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="680" y="640" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Layer 5: Review -->
+        <mxCell id="rev" value="⑦ review&#xa;근거 정합성 · 비교 축 일관성&#xa;필수 섹션 감리&#xa;→ review_result" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="510" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- REVIEW_INVALIDATIONS -->
+        <mxCell id="reset" value="REVIEW_INVALIDATIONS&#xa;revision_target downstream&#xa;fields 선택적 초기화&#xa;schema_retry_count 리셋" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="700" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- finish -->
+        <mxCell id="fin" value="finish&#xa;⑧ 전부 충족" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1000" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Hard Gate -->
+        <mxCell id="vgate" value="validate_final_delivery_state&#xa;hard gate" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="1080" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- BLOCKED -->
+        <mxCell id="blocked" value="❌ export 차단&#xa;status = failed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1090" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- EXPORT -->
+        <mxCell id="export" value="✅ assemble + export&#xa;.md  /  .html  /  .pdf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="980" y="1090" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- LOG -->
+        <mxCell id="log" value="📝 write_execution_log&#xa;logs/app.log  JSONL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="1190" width="180" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES -->
+        <mxCell id="e1" edge="1" source="start" target="pre" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" edge="1" source="pre" target="init" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" edge="1" source="init" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e4" value="① report_blueprint 없음" edge="1" source="sup" target="sbp" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="② market_context 없음" edge="1" source="sup" target="mr" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="③ lges_profile 없음" edge="1" source="sup" target="la" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" value="④ catl_profile 없음" edge="1" source="sup" target="ca" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" value="⑤ synthesis_claims 없음" edge="1" source="sup" target="cmp" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" value="⑥ supervisor sections 없음" edge="1" source="sup" target="ss" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" value="⑦ review_result 없음" edge="1" source="sup" target="rev" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" value="⑧ 전부 충족" edge="1" source="sup" target="fin" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e12" edge="1" source="sbp" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" edge="1" source="mr" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" edge="1" source="la" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e15" edge="1" source="ca" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e16" edge="1" source="cmp" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e17" edge="1" source="ss" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e18" value="passed" edge="1" source="rev" target="fin" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e19" value="failed + retry 예산 남음" edge="1" source="rev" target="reset" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e20" edge="1" source="reset" target="sup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e21" edge="1" source="fin" target="vgate" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e22" value="hard_errors 있음" edge="1" source="vgate" target="blocked" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e23" value="통과" edge="1" source="vgate" target="export" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e24" edge="1" source="export" target="log" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

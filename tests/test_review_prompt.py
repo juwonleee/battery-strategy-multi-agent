@@ -25,3 +25,4 @@ def test_build_review_prompt_includes_report_spec_and_validation_warnings(sample
         "Summary text exactly duplicates the final judgment."
     ]
     assert "report_spec 전체를 함께 검토한다" in prompt.instructions
+    assert "primary input" in prompt.instructions

@@ -1,6 +1,4 @@
-from prompts import build_company_analysis_prompt
-from pydantic import ValidationError
-
+from agents.company_analysis import run_company_analysis
 from state import (
     AgentState,
     CATL_REQUIRED_METRIC_FAMILIES,
@@ -8,15 +6,12 @@ from state import (
     CATLFactExtractionOutput,
     EvidenceRef,
 )
-from tools.openai_client import StructuredOutputError, invoke_structured_output
 from tools.fact_fallbacks import build_catl_fallback_facts
-from tools.fact_conversion import build_company_profile_from_facts
 from tools.normalization import (
-    MetricNormalizationError,
     build_profitability_reported_rows,
     normalize_catl_metrics,
 )
-from tools.validation import validate_fact_extraction_output
+from tools.openai_client import invoke_structured_output
 
 
 def catl_analysis_agent(state: AgentState) -> AgentState:
@@ -24,75 +19,26 @@ def catl_analysis_agent(state: AgentState) -> AgentState:
     config = state["config"]
     retriever = _load_retriever(config)
     evidence_refs = _retrieve_catl_evidence(state, retriever)
-    blueprint_questions = []
-    blueprint = state.get("report_blueprint")
-    if blueprint is not None:
-        for spec in blueprint.worker_task_specs:
-            if spec.worker_id == "catl_analysis":
-                blueprint_questions = list(spec.question_set)
-                break
-    prompt = build_company_analysis_prompt(
+
+    return run_company_analysis(
+        state,
         company_name="CATL",
         company_scope="catl",
-        goal=state["goal"],
-        market_context_summary="\n".join(
-            [state.get("market_context_summary", ""), *blueprint_questions]
-        ).strip(),
         evidence_refs=evidence_refs,
+        fact_output_model=CATLFactExtractionOutput,
         required_metric_families=list(CATL_REQUIRED_METRIC_FAMILIES),
         raw_metric_page_hints=list(CATL_REQUIRED_RAW_PAGES),
-    )
-
-    try:
-        extracted_output = invoke_structured_output(
-            config=config,
-            prompt=prompt,
-            response_model=CATLFactExtractionOutput,
-            max_output_tokens=max(config.openai_max_output_tokens, 4000),
-        )
-        catl_facts = CATLFactExtractionOutput.model_validate(extracted_output)
-    except (StructuredOutputError, ValidationError) as exc:
-        try:
-            catl_facts = build_catl_fallback_facts(evidence_refs)
-        except (ValidationError, ValueError) as fallback_exc:
-            return {
-                "status": "failed",
-                "last_error": f"{exc} | fallback failed: {fallback_exc}",
-            }
-
-    validation = validate_fact_extraction_output("catl", catl_facts)
-    if validation.hard_errors:
-        return {
-            "status": "failed",
-            "last_error": validation.hard_errors[0],
-        }
-
-    try:
-        profile = build_company_profile_from_facts(
-            catl_facts,
-            company_name="CATL",
-        )
-        catl_normalized_metrics = normalize_catl_metrics(catl_facts)
-        profitability_reported_rows = build_profitability_reported_rows(
+        invoke_fn=invoke_structured_output,
+        fallback_builder=build_catl_fallback_facts,
+        normalize_metrics=normalize_catl_metrics,
+        profitability_row_builder=lambda normalized_metrics: build_profitability_reported_rows(
             state.get("lges_normalized_metrics", []),
-            catl_normalized_metrics,
-        )
-    except MetricNormalizationError as exc:
-        return {
-            "status": "failed",
-            "last_error": str(exc),
-        }
-
-    return {
-        "catl_facts": catl_facts,
-        "catl_normalized_metrics": catl_normalized_metrics,
-        "profitability_reported_rows": profitability_reported_rows,
-        "catl_profile": profile,
-        "citation_refs": list(state.get("citation_refs", [])) + catl_facts.source_evidence_refs,
-        "schema_retry_count": 0,
-        "status": "running",
-        "last_error": None,
-    }
+            normalized_metrics,
+        ),
+        facts_key="catl_facts",
+        normalized_metrics_key="catl_normalized_metrics",
+        profile_key="catl_profile",
+    )
 
 
 def _retrieve_catl_evidence(state: AgentState, retriever) -> list[EvidenceRef]:

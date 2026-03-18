@@ -280,7 +280,7 @@ def _resolve_implication(
     return "근거 기반 비교 결과"
 
 
-def _build_scorecards(score_criteria: list[ScoreCriterion]) -> list[Scorecard]:
+def build_scorecards_from_criteria(score_criteria: list[ScoreCriterion]) -> list[Scorecard]:
     card_state = {
         "lges": _empty_scorecard_state("LG Energy Solution"),
         "catl": _empty_scorecard_state("CATL"),
@@ -304,6 +304,10 @@ def _build_scorecards(score_criteria: list[ScoreCriterion]) -> list[Scorecard]:
         )
         for card in card_state.values()
     ]
+
+
+def _build_scorecards(score_criteria: list[ScoreCriterion]) -> list[Scorecard]:
+    return build_scorecards_from_criteria(score_criteria)
 
 
 def _empty_scorecard_state(company_name: str) -> dict[str, object]:

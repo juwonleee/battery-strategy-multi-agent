@@ -1,0 +1,161 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="Claude" version="21.0.0" type="device">
+  <diagram name="Claim Lineage" id="claim-lineage">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Claim Lineage — DocumentRef to FinalJudgment Traceability" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="1200" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             LAYER: SOURCE
+             ════════════════════════ -->
+        <mxCell id="grp_src" value="원문 소스  (data/raw)" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="300" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="doc" value="📄 DocumentRef&#xa;─────────────────&#xa;document_id&#xa;title · source_path&#xa;source_type · company_scope&#xa;published_at · page_range" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;" vertex="1" parent="grp_src">
+          <mxGeometry x="20" y="45" width="260" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             LAYER: RAG RETRIEVAL
+             ════════════════════════ -->
+        <mxCell id="grp_rag" value="RAG Retrieval  (tools.retrieval)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="260" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pchunk" value="ProcessedChunk&#xa;─────────────────&#xa;chunk_id · document_id&#xa;page · text · char_count&#xa;source_type · company_scope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;" vertex="1" parent="grp_rag">
+          <mxGeometry x="20" y="40" width="260" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="eref" value="EvidenceRef&#xa;─────────────────&#xa;document_id · chunk_id&#xa;source_path · page&#xa;section_title · snippet · score" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;" vertex="1" parent="grp_rag">
+          <mxGeometry x="20" y="125" width="260" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             LAYER: FACT
+             ════════════════════════ -->
+        <mxCell id="grp_fact" value="Fact Layer  (worker agents)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="80" width="340" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="afc" value="AtomicFactClaim&#xa;─────────────────&#xa;claim_id = {scope}-{category}-{ordinal}&#xa;  e.g. 'lges-strategy-1'&#xa;scope · category · ordinal&#xa;claim_text&#xa;evidence_refs  ← 1개 이상 필수" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;" vertex="1" parent="grp_fact">
+          <mxGeometry x="20" y="40" width="300" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="mfc" value="MetricFactClaim&#xa;─────────────────&#xa;claim_id = {scope}-{category}-{ordinal}&#xa;  e.g. 'catl-gross_profit_margin-2'&#xa;metric_name · value · unit · period&#xa;reported_basis  (guidance / reported)&#xa;evidence_refs  ← 1개 이상 필수" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;" vertex="1" parent="grp_fact">
+          <mxGeometry x="20" y="170" width="300" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="fact_note" value="⚠️ model_validator: scope alignment 강제&#xa;claim.scope ≠ extraction.scope → ValueError" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="grp_fact">
+          <mxGeometry x="20" y="305" width="300" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             LAYER: NORMALIZATION
+             ════════════════════════ -->
+        <mxCell id="grp_norm" value="Normalization  (tools.normalization)" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="500" width="340" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="nm" value="NormalizedMetric&#xa;─────────────────&#xa;normalized_metric_name&#xa;reported_basis · period · unit  보존&#xa;is_derived = True  (파생 지표)&#xa;  → CATL net_profit_margin 면제 규칙&#xa;source_claim_ids · evidence_refs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;" vertex="1" parent="grp_norm">
+          <mxGeometry x="20" y="40" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="mcr" value="MetricComparisonRow&#xa;─────────────────&#xa;row_id · metric_name · period&#xa;lges_value · catl_value · basis_note&#xa;comparability_status&#xa;  direct / reference_only / reject" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;" vertex="1" parent="grp_norm">
+          <mxGeometry x="20" y="155" width="300" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             LAYER: COMPARISON
+             ════════════════════════ -->
+        <mxCell id="grp_cmp" value="Comparison Layer  (comparison agent)" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="80" width="360" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="cis" value="ComparisonInputSpec&#xa;─────────────────&#xa;lges_catalog  최대 12 claim&#xa;catl_catalog  최대 12 claim&#xa;allowed_claim_ids()&#xa;  → 이 집합에 없는 ID 참조 시 hard-gate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;" vertex="1" parent="grp_cmp">
+          <mxGeometry x="20" y="40" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="sc" value="SynthesisClaim&#xa;─────────────────&#xa;claim_id · claim_text&#xa;supporting_claim_ids  2개 이상 필수&#xa;  ※ allowed_claim_ids 범위만 허용&#xa;confidence_level" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;" vertex="1" parent="grp_cmp">
+          <mxGeometry x="20" y="155" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="scri" value="ScoreCriterion&#xa;─────────────────&#xa;criterion_key · company_scope&#xa;score  1~5 또는 null&#xa;rationale · supporting_claim_ids&#xa;evidence_refs  ← materialized 필수" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;" vertex="1" parent="grp_cmp">
+          <mxGeometry x="20" y="260" width="320" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             LAYER: SUPERVISOR-OWNED
+             ════════════════════════ -->
+        <mxCell id="grp_sup" value="Supervisor-Owned Layer  (supervisor_synthesis)" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="80" width="340" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="fj" value="FinalJudgment&#xa;─────────────────&#xa;judgment_text&#xa;supporting_claim_ids&#xa;confidence_level" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;" vertex="1" parent="grp_sup">
+          <mxGeometry x="20" y="40" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ssr" value="supervisor_score_rationales&#xa;─────────────────&#xa;ScoreCriterion 목록&#xa;evidence_refs  materialized&#xa;  (chain 상속 금지)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;" vertex="1" parent="grp_sup">
+          <mxGeometry x="20" y="140" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="swot" value="SwotEntry&#xa;─────────────────&#xa;company_name&#xa;strengths · weaknesses&#xa;opportunities · threats&#xa;evidence_refs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;" vertex="1" parent="grp_sup">
+          <mxGeometry x="20" y="240" width="300" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             LAYER: REPORT SPEC
+             ════════════════════════ -->
+        <mxCell id="grp_rs" value="ReportSpec  (제출 계약)" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="500" width="360" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="rs" value="ReportSpec&#xa;─────────────────&#xa;atomic_claims · metric_claims&#xa;synthesis_claims · swot_matrix&#xa;score_criteria · metric_comparison_rows&#xa;charts · final_judgment · references&#xa;selected_comparison_rows&#xa;reference_only_rows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;align=left;" vertex="1" parent="grp_rs">
+          <mxGeometry x="20" y="40" width="200" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="rs_note" value="⚠️ model_validator:&#xa;claim_id 중복 → ValueError" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="grp_rs">
+          <mxGeometry x="235" y="50" width="110" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ════════════════════════
+             TRACEABILITY PATH (bottom)
+             ════════════════════════ -->
+        <mxCell id="trace_bg" value="역추적 경로  (FinalJudgment → 원문 페이지)" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontSize=13;fontStyle=3;" vertex="1" parent="1">
+          <mxGeometry x="40" y="820" width="1580" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="FinalJudgment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="trace_bg">
+          <mxGeometry x="20" y="40" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="SynthesisClaim" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="trace_bg">
+          <mxGeometry x="240" y="40" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" value="AtomicFactClaim&#xa;MetricFactClaim" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="trace_bg">
+          <mxGeometry x="460" y="40" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" value="EvidenceRef" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="trace_bg">
+          <mxGeometry x="680" y="40" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t5" value="DocumentRef&#xa;source_path · page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="trace_bg">
+          <mxGeometry x="900" y="40" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t6" value="📄 원문 PDF&#xa;특정 페이지" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="trace_bg">
+          <mxGeometry x="1120" y="40" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_e1" value="supporting_claim_ids" edge="1" source="t1" target="t2" parent="trace_bg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="t_e2" value="supporting_claim_ids" edge="1" source="t2" target="t3" parent="trace_bg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="t_e3" value="evidence_refs" edge="1" source="t3" target="t4" parent="trace_bg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="t_e4" value="document_id · chunk_id" edge="1" source="t4" target="t5" parent="trace_bg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="t_e5" value="source_path · page" edge="1" source="t5" target="t6" parent="trace_bg"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- MAIN EDGES -->
+        <mxCell id="me1" edge="1" source="doc" target="pchunk" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me2" edge="1" source="pchunk" target="eref" parent="grp_rag"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me3" edge="1" source="eref" target="afc" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me4" edge="1" source="eref" target="mfc" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me5" edge="1" source="mfc" target="nm" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me6" edge="1" source="nm" target="mcr" parent="grp_norm"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me7" edge="1" source="afc" target="cis" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me8" edge="1" source="mfc" target="cis" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me9" edge="1" source="cis" target="sc" parent="grp_cmp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me10" edge="1" source="cis" target="scri" parent="grp_cmp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me11" edge="1" source="sc" target="fj" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me12" edge="1" source="scri" target="ssr" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me13" edge="1" source="afc" target="swot" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me14" edge="1" source="fj" target="rs" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me15" edge="1" source="ssr" target="rs" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me16" edge="1" source="swot" target="rs" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="me17" edge="1" source="mcr" target="rs" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

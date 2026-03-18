@@ -25,6 +25,7 @@ class ReportExportError(RuntimeError):
 
 
 def build_report_spec(state: AgentState) -> ReportSpec:
+    """Assemble the submission contract owned by supervisor synthesis and review."""
     return _build_report_spec(state)
 
 

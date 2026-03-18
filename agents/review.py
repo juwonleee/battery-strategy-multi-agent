@@ -1,6 +1,7 @@
 from prompts import build_review_prompt
 from pydantic import ValidationError
 from state import AgentState, ReviewResult
+from tools.comparison_contract import build_scorecards_from_criteria
 from tools.openai_client import StructuredOutputError, invoke_structured_output
 from tools.reporting import build_report_spec
 from tools.validation import validate_final_delivery_state
@@ -24,11 +25,12 @@ def review_agent(state: AgentState) -> AgentState:
             "last_error": str(exc),
         }
 
+    compatibility_inputs = _build_review_compatibility_inputs(state, report_spec)
     prompt = build_review_prompt(
         market_context_summary=state.get("market_context_summary", ""),
-        comparison_matrix=state.get("comparison_matrix", []),
-        swot_matrix=state.get("swot_matrix", []),
-        scorecard=state.get("scorecard", []),
+        comparison_matrix=compatibility_inputs["comparison_matrix"],
+        swot_matrix=compatibility_inputs["swot_matrix"],
+        scorecard=compatibility_inputs["scorecard"],
         low_confidence_claims=state.get("low_confidence_claims", []),
         report_spec=report_spec,
         validation_warnings=state.get("validation_warnings", []),
@@ -92,4 +94,13 @@ def review_agent(state: AgentState) -> AgentState:
         "schema_retry_count": 0,
         "status": "reviewed",
         "last_error": None,
+    }
+
+
+def _build_review_compatibility_inputs(state: AgentState, report_spec) -> dict[str, list]:
+    return {
+        "comparison_matrix": report_spec.quick_comparison_panel or state.get("comparison_matrix", []),
+        "swot_matrix": report_spec.swot_matrix or state.get("swot_matrix", []),
+        "scorecard": build_scorecards_from_criteria(report_spec.score_criteria)
+        or state.get("scorecard", []),
     }

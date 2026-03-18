@@ -1,0 +1,165 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="Claude" version="21.0.0" type="device">
+  <diagram name="Schema Validation Flow" id="schema-validation">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Schema Validation Flow — Pydantic model_validate() to AgentState" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="20" width="1400" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- LLM Response -->
+        <mxCell id="llm" value="🤖 LLM 응답 수신&#xa;(raw JSON)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="80" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- model_validate -->
+        <mxCell id="mv" value="Pydantic model_validate()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="190" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════
+             BRANCH 1: ReportBlueprint
+             ══════════════════════════════ -->
+        <mxCell id="v1" value="ReportBlueprint&#xa;model_validator" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="310" width="200" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="v1_c1" value="① comparison_axes&#xa;4개 · 정해진 순서 불일치" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="460" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="v1_c2" value="② worker_task_specs&#xa;3개 미만 또는&#xa;worker ID 불일치" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="195" y="460" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="v1_c3" value="③ forbidden_outputs 누락&#xa;final_judgment · executive_summary&#xa;final_swot · final_score_rationale" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="365" y="460" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="v1_ok" value="report_blueprint&#xa;✅ AgentState 업데이트" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="460" width="60" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════
+             BRANCH 2: FactExtractionOutput
+             ══════════════════════════════ -->
+        <mxCell id="v2" value="FactExtractionOutput&#xa;model_validator" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="310" width="220" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- scope alignment -->
+        <mxCell id="v2a" value="scope alignment 검사&#xa;claim.scope ≠ extraction.scope?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="540" y="450" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fail_scope" value="ValueError&#xa;'LGES claim이 CATL&#xa;컨텍스트에 있음'&#xa;→ schema retry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="430" y="580" width="140" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- metric families LGES -->
+        <mxCell id="v2b_lges" value="LGES required metric families&#xa;revenue_growth_guidance&#xa;operating_margin_guidance_or_actual&#xa;capex · ess_capacity · secured_order_volume" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="540" y="580" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="fail_lges" value="ValueError&#xa;'LGES missing metric families'&#xa;→ schema retry&#xa;→ lges_analysis 재시도" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="540" y="730" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- metric families CATL -->
+        <mxCell id="v2b_catl" value="CATL required metric families&#xa;revenue · gross_profit_margin&#xa;net_profit_margin · roe · operating_cash_flow&#xa;※ revenue+profit_for_year 있으면 margin 면제" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="720" y="580" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="fail_catl" value="ValueError&#xa;'CATL missing metric families'&#xa;→ schema retry&#xa;→ catl_analysis 재시도" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="720" y="730" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fact_ok" value="lges_facts / catl_facts&#xa;✅ AgentState 업데이트" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="870" y="610" width="130" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════
+             BRANCH 3: ComparisonEvidenceOutput
+             ══════════════════════════════ -->
+        <mxCell id="v3" value="ComparisonEvidenceOutput&#xa;validation&#xa;(tools/validation.py)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="310" width="220" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fail_syn" value="hard-gate:&#xa;synthesis-support-count&#xa;SynthesisClaim&#xa;supporting_claim_ids &lt; 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="960" y="460" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="fail_orig" value="hard-gate:&#xa;supporting-claim-origin&#xa;claim_ids가&#xa;allowed_claim_ids 범위 밖" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="460" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="fail_score" value="hard-gate:&#xa;score-criterion-evidence&#xa;ScoreCriterion&#xa;evidence_refs 없음" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="460" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cmp_ok" value="comparison_input_spec&#xa;synthesis_claims&#xa;✅ AgentState 업데이트" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="460" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════
+             BRANCH 4: ReportSpec
+             ══════════════════════════════ -->
+        <mxCell id="v4" value="ReportSpec&#xa;model_validator" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="310" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="fail_dup" value="ValueError&#xa;'claim_id must be unique'&#xa;→ schema retry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="460" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="spec_ok" value="report_spec&#xa;✅ 제출 계약 객체 완성" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="560" width="140" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════
+             SUPERVISOR RETRY LOGIC
+             ══════════════════════════════ -->
+        <mxCell id="retry_bg" value="Supervisor Schema Retry Logic" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="870" width="580" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="sr" value="schema_retry_count&#xa;&lt; schema_validation_max ?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="retry_bg">
+          <mxGeometry x="20" y="50" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="redo" value="현재 step 재시도&#xa;schema_retry_count + 1&#xa;(기본 한도: 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="retry_bg">
+          <mxGeometry x="280" y="60" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="abort" value="finish&#xa;status = failed&#xa;예산 소진" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="retry_bg">
+          <mxGeometry x="440" y="60" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sr_yes" value="Yes" edge="1" source="sr" target="redo" parent="retry_bg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="sr_no" value="No" edge="1" source="sr" target="abort" parent="retry_bg"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- EDGES -->
+        <mxCell id="e_llm_mv" edge="1" source="llm" target="mv" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_mv_v1" edge="1" source="mv" target="v1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_mv_v2" edge="1" source="mv" target="v2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_mv_v3" edge="1" source="mv" target="v3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_mv_v4" edge="1" source="mv" target="v4" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e_v1_c1" value="ValueError" edge="1" source="v1" target="v1_c1" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v1_c2" value="ValueError" edge="1" source="v1" target="v1_c2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v1_c3" value="ValueError" edge="1" source="v1" target="v1_c3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v1_ok" value="통과" edge="1" source="v1" target="v1_ok" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e_v2_v2a" edge="1" source="v2" target="v2a" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v2a_fail" value="불일치" edge="1" source="v2a" target="fail_scope" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v2a_lges" value="통과→LGES" edge="1" source="v2a" target="v2b_lges" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v2a_catl" value="통과→CATL" edge="1" source="v2a" target="v2b_catl" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_lges_fail" value="누락" edge="1" source="v2b_lges" target="fail_lges" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_catl_fail" value="누락" edge="1" source="v2b_catl" target="fail_catl" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_catl_ok" value="통과" edge="1" source="v2b_catl" target="fact_ok" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e_v3_syn" value="위반" edge="1" source="v3" target="fail_syn" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v3_orig" value="위반" edge="1" source="v3" target="fail_orig" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v3_score" value="위반" edge="1" source="v3" target="fail_score" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v3_ok" value="통과" edge="1" source="v3" target="cmp_ok" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e_v4_dup" value="중복" edge="1" source="v4" target="fail_dup" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v4_ok" value="통과" edge="1" source="v4" target="spec_ok" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e_fails_retry" value="→ supervisor retry" edge="1" source="v1_c1" target="sr" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_fails_retry2" edge="1" source="fail_scope" target="sr" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_fails_retry3" edge="1" source="fail_lges" target="sr" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_fails_retry4" edge="1" source="fail_catl" target="sr" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_fails_retry5" edge="1" source="fail_dup" target="sr" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

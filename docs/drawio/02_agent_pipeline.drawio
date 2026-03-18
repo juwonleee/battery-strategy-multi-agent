@@ -1,0 +1,173 @@
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="Claude" version="21.0.0" type="device">
+  <diagram name="AI Agent Pipeline" id="agent-pipeline">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="AI Agent Pipeline — Input to Report Export" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="1200" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ─── INPUT ─── -->
+        <mxCell id="grp_input" value="입력" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="pdf" value="📄 PDF 문서셋&#xa;data/raw/*.pdf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="grp_input">
+          <mxGeometry x="20" y="40" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="manifest" value="document_manifest.json&#xa;scope 메타데이터" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="grp_input">
+          <mxGeometry x="150" y="40" width="110" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ─── PREPROCESSING ─── -->
+        <mxCell id="grp_pre" value="전처리  (tools.preprocessing / retrieval)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="240" width="280" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="chunk" value="청킹&#xa;1200자 · overlap 200&#xa;→ corpus.jsonl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_pre">
+          <mxGeometry x="20" y="40" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="embed" value="임베딩&#xa;intfloat/multilingual-e5-large" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_pre">
+          <mxGeometry x="20" y="105" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="faiss" value="FAISS index&#xa;data/index/faiss.index" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_pre">
+          <mxGeometry x="20" y="155" width="240" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- ─── BLUEPRINT ─── -->
+        <mxCell id="grp_bp" value="① Supervisor Blueprint" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="80" width="280" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="sbp2" value="supervisor_blueprint_agent&#xa;· 비교 축 4개 고정&#xa;· worker contract 정의&#xa;· comparability precheck" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="grp_bp">
+          <mxGeometry x="10" y="40" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="bp_out" value="report_blueprint&#xa;(model_validator 강제)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="grp_bp">
+          <mxGeometry x="200" y="55" width="70" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ─── MARKET ─── -->
+        <mxCell id="grp_mkt" value="② Market Research  (worker)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="250" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="mr2" value="market_research_agent&#xa;scope=market retrieval  top-k=6&#xa;→ fact extraction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_mkt">
+          <mxGeometry x="10" y="40" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="mr_out" value="market_facts&#xa;market_context&#xa;market_context_summary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_mkt">
+          <mxGeometry x="200" y="40" width="70" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ─── LGES ─── -->
+        <mxCell id="grp_lges" value="③ LGES Analysis  (worker)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="395" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="la2" value="lges_analysis_agent&#xa;scope=lges retrieval&#xa;fact extraction + normalization&#xa;required metric families 검증" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_lges">
+          <mxGeometry x="10" y="40" width="180" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="la_out" value="lges_facts&#xa;lges_profile&#xa;lges_normalized_metrics&#xa;profitability_rows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_lges">
+          <mxGeometry x="200" y="40" width="70" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- ─── CATL ─── -->
+        <mxCell id="grp_catl" value="④ CATL Analysis  (worker)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="550" width="280" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="ca2" value="catl_analysis_agent&#xa;scope=catl retrieval&#xa;fact extraction + normalization&#xa;required metric families 검증" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_catl">
+          <mxGeometry x="10" y="40" width="180" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="ca_out" value="catl_facts&#xa;catl_profile&#xa;catl_normalized_metrics&#xa;profitability_rows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="grp_catl">
+          <mxGeometry x="200" y="40" width="70" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- ─── COMPARISON ─── -->
+        <mxCell id="grp_cmp" value="⑤ Comparison  (worker)" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="350" width="300" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="cspec" value="tools.comparison_contract&#xa;fact layer →&#xa;ComparisonInputSpec&#xa;각 사 최대 12 claim" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="grp_cmp">
+          <mxGeometry x="10" y="40" width="130" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cmp2" value="comparison_agent&#xa;새 retrieval 없음&#xa;claim catalog만 사용" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="grp_cmp">
+          <mxGeometry x="10" y="120" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cmp_out" value="synthesis_claims&#xa;score_criteria&#xa;metric_comparison_rows&#xa;low_confidence_claims" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="grp_cmp">
+          <mxGeometry x="160" y="40" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ─── SUPERVISOR SYNTHESIS ─── -->
+        <mxCell id="grp_ss" value="⑥ Supervisor Synthesis" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="570" width="300" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="ss2" value="supervisor_synthesis_agent&#xa;최종 보고서 섹션 직접 작성&#xa;worker는 여기에 쓸 수 없음" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="grp_ss">
+          <mxGeometry x="10" y="40" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ss_out" value="selected_comparison_rows&#xa;reference_only_rows&#xa;executive_summary&#xa;supervisor_swot&#xa;final_judgment&#xa;implications · limitations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="grp_ss">
+          <mxGeometry x="170" y="30" width="120" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- ─── REVIEW ─── -->
+        <mxCell id="grp_rev" value="⑦ Review" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="440" width="280" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="rspec" value="tools.reporting&#xa;build_report_spec&#xa;→ ReportSpec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="grp_rev">
+          <mxGeometry x="10" y="40" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="rev2" value="review_agent&#xa;근거 정합성&#xa;비교 축 감리" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="grp_rev">
+          <mxGeometry x="10" y="110" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="rev_out" value="review_result&#xa;passed&#xa;revision_target" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="grp_rev">
+          <mxGeometry x="150" y="50" width="110" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ─── EXPORT ─── -->
+        <mxCell id="grp_exp" value="⑧ Report Assembly" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="650" width="280" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="vgate2" value="validate_final_delivery_state&#xa;hard gate" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="grp_exp">
+          <mxGeometry x="10" y="40" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="md_out" value="report.md" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="grp_exp">
+          <mxGeometry x="180" y="40" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="html_out" value="report.html" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="grp_exp">
+          <mxGeometry x="180" y="80" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="pdf_out" value="report.pdf&#xa;(Playwright)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="grp_exp">
+          <mxGeometry x="180" y="120" width="80" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES -->
+        <mxCell id="ep1" edge="1" source="pdf" target="chunk" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep2" edge="1" source="chunk" target="embed" parent="grp_pre"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep3" edge="1" source="embed" target="faiss" parent="grp_pre"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="ep4" value="FAISS index" edge="1" source="grp_pre" target="mr2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep5" edge="1" source="grp_pre" target="la2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep6" edge="1" source="grp_pre" target="ca2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="ep7" value="report_blueprint" edge="1" source="bp_out" target="mr2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep8" edge="1" source="bp_out" target="la2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep9" edge="1" source="bp_out" target="ca2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep10" edge="1" source="bp_out" target="ss2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="ep11" edge="1" source="mr_out" target="cspec" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep12" edge="1" source="la_out" target="cspec" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep13" edge="1" source="ca_out" target="cspec" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="ep14" edge="1" source="cspec" target="cmp2" parent="grp_cmp"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="ep15" edge="1" source="mr_out" target="ss2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep16" edge="1" source="la_out" target="ss2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep17" edge="1" source="ca_out" target="ss2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep18" edge="1" source="cmp_out" target="ss2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="ep19" edge="1" source="ss_out" target="rspec" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep20" edge="1" source="rspec" target="rev2" parent="grp_rev"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="ep21" value="passed" edge="1" source="rev_out" target="vgate2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep22" value="통과" edge="1" source="vgate2" target="md_out" parent="grp_exp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep23" edge="1" source="vgate2" target="html_out" parent="grp_exp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ep24" edge="1" source="vgate2" target="pdf_out" parent="grp_exp"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
