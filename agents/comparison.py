@@ -43,6 +43,7 @@ def comparison_agent(state: AgentState) -> AgentState:
         "scorecard": output.scorecard,
         "low_confidence_claims": output.low_confidence_claims,
         "citation_refs": list(state.get("citation_refs", [])) + comparison_evidence_refs,
+        "schema_retry_count": 0,
         "status": "running",
         "last_error": None,
     }

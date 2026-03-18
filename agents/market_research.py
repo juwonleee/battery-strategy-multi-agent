@@ -38,6 +38,7 @@ def market_research_agent(state: AgentState) -> AgentState:
         "market_context": market_context,
         "market_context_summary": market_context.summary,
         "citation_refs": evidence_refs,
+        "schema_retry_count": 0,
         "status": "running",
         "last_error": None,
     }

@@ -31,6 +31,7 @@ def lges_analysis_agent(state: AgentState) -> AgentState:
     return {
         "lges_profile": profile,
         "citation_refs": list(state.get("citation_refs", [])) + evidence_refs,
+        "schema_retry_count": 0,
         "status": "running",
         "last_error": None,
     }
