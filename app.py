@@ -4,6 +4,13 @@ from config import load_config
 from graph import run_once, write_execution_log
 from state import AgentState, ReportArtifact, append_execution_log, build_initial_state
 from tools.preprocessing import prepare_document_corpus
+from tools.reporting import (
+    ReportExportError,
+    assemble_markdown_report,
+    export_markdown_report,
+    export_pdf_report,
+    mark_report_artifact_status,
+)
 from tools.retrieval import prepare_retrieval_assets
 
 
@@ -36,9 +43,15 @@ def main() -> None:
     else:
         state = _mark_iteration_limit_exceeded(state)
 
+    if state.get("status") == "completed":
+        state = _export_reports(state)
+
     write_execution_log(state, config.log_path)
-    state["report_artifacts"] = _mark_log_artifact_created(
-        state.get("report_artifacts", []), config.log_path
+    state["report_artifacts"] = _mark_artifact_created(
+        state.get("report_artifacts", []),
+        artifact_type="log",
+        path=config.log_path,
+        created=config.log_path.exists(),
     )
 
     print("Workflow finished:", state.get("status"))
@@ -46,6 +59,61 @@ def main() -> None:
     print("Processed corpus:", preprocessing_summary.processed_corpus_path)
     print("FAISS index:", retrieval_handles["faiss_index_path"])
     print("Execution log:", config.log_path)
+    print("Markdown report:", config.output_markdown_path)
+    print("PDF report:", config.output_pdf_path)
+
+
+def _export_reports(state: AgentState) -> AgentState:
+    config = state["config"]
+    markdown = assemble_markdown_report(state)
+
+    export_markdown_report(markdown, config.output_markdown_path)
+    exported_state = {
+        **state,
+        "report_artifacts": _mark_artifact_created(
+            state.get("report_artifacts", []),
+            artifact_type="markdown",
+            path=config.output_markdown_path,
+            created=True,
+        ),
+    }
+    exported_state["execution_log"] = append_execution_log(
+        exported_state,
+        step="finish",
+        status="completed",
+        message=f"Markdown report exported to {config.output_markdown_path}.",
+    )
+
+    try:
+        export_pdf_report(markdown, config.output_pdf_path)
+    except ReportExportError as exc:
+        exported_state["report_artifacts"] = _mark_artifact_created(
+            exported_state.get("report_artifacts", []),
+            artifact_type="pdf",
+            path=config.output_pdf_path,
+            created=False,
+        )
+        exported_state["execution_log"] = append_execution_log(
+            exported_state,
+            step="finish",
+            status="completed",
+            message=f"PDF export skipped: {exc}",
+        )
+        return exported_state
+
+    exported_state["report_artifacts"] = _mark_artifact_created(
+        exported_state.get("report_artifacts", []),
+        artifact_type="pdf",
+        path=config.output_pdf_path,
+        created=True,
+    )
+    exported_state["execution_log"] = append_execution_log(
+        exported_state,
+        step="finish",
+        status="completed",
+        message=f"PDF report exported to {config.output_pdf_path}.",
+    )
+    return exported_state
 
 
 def _mark_iteration_limit_exceeded(state: AgentState) -> AgentState:
@@ -66,28 +134,19 @@ def _mark_iteration_limit_exceeded(state: AgentState) -> AgentState:
     return limited_state
 
 
-def _mark_log_artifact_created(
-    artifacts: list[ReportArtifact], log_path: Path
+def _mark_artifact_created(
+    artifacts: list[ReportArtifact],
+    *,
+    artifact_type: str,
+    path: Path,
+    created: bool,
 ) -> list[ReportArtifact]:
-    updated: list[ReportArtifact] = []
-    matched = False
-    for artifact in artifacts:
-        if artifact.artifact_type == "log" and Path(artifact.path) == log_path:
-            updated.append(
-                artifact.model_copy(update={"created": log_path.exists()})
-            )
-            matched = True
-        else:
-            updated.append(artifact)
-    if not matched:
-        updated.append(
-            ReportArtifact(
-                artifact_type="log",
-                path=str(log_path),
-                created=log_path.exists(),
-            )
-        )
-    return updated
+    return mark_report_artifact_status(
+        artifacts,
+        artifact_type=artifact_type,
+        path=path,
+        created=created,
+    )
 
 
 if __name__ == "__main__":
