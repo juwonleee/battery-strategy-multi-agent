@@ -113,6 +113,11 @@ class MarketContext(BaseModel):
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
 
 
+class FinancialIndicator(BaseModel):
+    metric: str
+    value: str
+
+
 class CompanyProfile(BaseModel):
     company_name: str
     business_overview: str
@@ -120,7 +125,7 @@ class CompanyProfile(BaseModel):
     diversification_strategy: list[str] = Field(default_factory=list)
     regional_strategy: list[str] = Field(default_factory=list)
     technology_strategy: list[str] = Field(default_factory=list)
-    financial_indicators: dict[str, str] = Field(default_factory=dict)
+    financial_indicators: list[FinancialIndicator] = Field(default_factory=list)
     risk_factors: list[str] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
 
