@@ -88,6 +88,14 @@ def build_company_analysis_prompt(
                 "CompanyProfile 객체를 반환한다.",
                 "business_overview, diversification_strategy, regional_strategy, technology_strategy, financial_indicators, risk_factors는 모두 한국어로 작성한다.",
                 "리스트 항목은 짧고 구체적이어야 하며 제공된 근거에만 기반해야 한다.",
+                (
+                    "financial_indicators 작성 규칙:\n"
+                    "- 매출, 영업이익, 영업이익률, EBITDA, 순이익, ROE, 부채비율 등 실제 재무 수치만 포함한다.\n"
+                    "- 매출 성장률 가이던스와 영업이익률 목표는 반드시 별도 항목으로 분리한다.\n"
+                    "- 예시: {metric: '2026E 매출 성장률', value: 'Mid-teen ~ +20% YoY'}, "
+                    "{metric: '2026E 영업이익률 목표', value: '+Mid-single%'}\n"
+                    "- 전략적 방향(다각화, 투자 계획 등)은 diversification_strategy에 작성하고 financial_indicators에 섞지 않는다."
+                ),
             ]
         ),
         input_text=input_text,
