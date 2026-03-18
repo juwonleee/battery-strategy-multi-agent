@@ -41,4 +41,5 @@ def comparison_agent(state: AgentState) -> AgentState:
         "comparison_matrix": comparison,
         "swot_matrix": swot,
         "scorecard": scorecard,
+        "status": "running",
     }

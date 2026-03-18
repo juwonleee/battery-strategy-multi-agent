@@ -7,4 +7,4 @@ def catl_analysis_agent(state: AgentState) -> AgentState:
         company_name="CATL",
         business_overview="CATL 전략 분석 초안",
     )
-    return {"catl_profile": profile}
+    return {"catl_profile": profile, "status": "running"}
