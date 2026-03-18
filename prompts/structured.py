@@ -187,7 +187,7 @@ def build_review_repair_prompt(
     )
 
 
-def serialize_evidence_refs(evidence_refs: list[EvidenceRef], *, snippet_limit: int = 280) -> str:
+def serialize_evidence_refs(evidence_refs: list[EvidenceRef], *, snippet_limit: int = 500) -> str:
     if not evidence_refs:
         return "- 정보 부족"
 
