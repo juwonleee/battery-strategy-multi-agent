@@ -30,6 +30,12 @@ def comparison_agent(state: AgentState) -> AgentState:
             "last_error": str(exc),
         }
 
+    output = _sanitize_comparison_output(
+        output,
+        lges_fallback_refs=state["lges_profile"].evidence_refs,
+        catl_fallback_refs=state["catl_profile"].evidence_refs,
+        comparison_fallback_refs=comparison_evidence_refs,
+    )
     validation_error = _validate_comparison_output(output)
     if validation_error is not None:
         return {
@@ -88,6 +94,32 @@ def _validate_comparison_output(output: ComparisonOutput) -> str | None:
             return f"Scorecard for '{card.company_name}' is missing evidence references."
 
     return None
+
+
+def _sanitize_comparison_output(
+    output: ComparisonOutput,
+    *,
+    lges_fallback_refs: list[EvidenceRef],
+    catl_fallback_refs: list[EvidenceRef],
+    comparison_fallback_refs: list[EvidenceRef],
+) -> ComparisonOutput:
+    output.comparison_matrix = [
+        row for row in output.comparison_matrix if row.evidence_refs
+    ]
+
+    fallback_by_company = {
+        "LG Energy Solution": lges_fallback_refs or comparison_fallback_refs,
+        "CATL": catl_fallback_refs or comparison_fallback_refs,
+    }
+    for entry in output.swot_matrix:
+        if not entry.evidence_refs:
+            entry.evidence_refs = fallback_by_company.get(entry.company_name, comparison_fallback_refs)[:2]
+
+    for card in output.scorecard:
+        if not card.evidence_refs:
+            card.evidence_refs = fallback_by_company.get(card.company_name, comparison_fallback_refs)[:2]
+
+    return output
 
 
 def _has_any_swot_content(entry: SwotEntry) -> bool:

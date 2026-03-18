@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 from pydantic import BaseModel, Field
@@ -94,6 +95,7 @@ class RetryBudget(BaseModel):
 
 
 class ExecutionLogEntry(BaseModel):
+    timestamp: str
     step: WorkflowStep
     status: WorkflowStatus
     message: str
@@ -203,6 +205,7 @@ class AgentState(TypedDict, total=False):
     schema_retry_count: int
     review_retry_count: int
     current_step: WorkflowStep
+    routing_reason: str | None
     status: WorkflowStatus
     last_error: str | None
 
@@ -216,6 +219,7 @@ def build_initial_state(
 ) -> AgentState:
     manifest_documents = list(source_documents or [])
     log_entry = ExecutionLogEntry(
+        timestamp=_utc_now_iso(),
         step="market_research",
         status="initialized",
         message="Initial workflow state created.",
@@ -254,6 +258,7 @@ def build_initial_state(
         "schema_retry_count": 0,
         "review_retry_count": 0,
         "current_step": "market_research",
+        "routing_reason": None,
         "status": "initialized",
         "last_error": None,
     }
@@ -269,6 +274,16 @@ def append_execution_log(
 ) -> list[ExecutionLogEntry]:
     entries = list(state.get("execution_log", []))
     entries.append(
-        ExecutionLogEntry(step=step, status=status, message=message, attempt=attempt)
+        ExecutionLogEntry(
+            timestamp=_utc_now_iso(),
+            step=step,
+            status=status,
+            message=message,
+            attempt=attempt,
+        )
     )
     return entries
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
