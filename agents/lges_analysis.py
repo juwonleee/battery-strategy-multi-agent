@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from state import AgentState, EvidenceRef, LGESFactExtractionOutput, LGES_REQUIRED_METRIC_FAMILIES
 from tools.openai_client import StructuredOutputError, invoke_structured_output
+from tools.fact_fallbacks import build_lges_fallback_facts
 from tools.fact_conversion import build_company_profile_from_facts
 from tools.normalization import (
     MetricNormalizationError,
@@ -17,11 +18,20 @@ def lges_analysis_agent(state: AgentState) -> AgentState:
     config = state["config"]
     retriever = _load_retriever(config)
     evidence_refs = _retrieve_lges_evidence(state, retriever)
+    blueprint_questions = []
+    blueprint = state.get("report_blueprint")
+    if blueprint is not None:
+        for spec in blueprint.worker_task_specs:
+            if spec.worker_id == "lges_analysis":
+                blueprint_questions = list(spec.question_set)
+                break
     prompt = build_company_analysis_prompt(
         company_name="LG Energy Solution",
         company_scope="lges",
         goal=state["goal"],
-        market_context_summary=state.get("market_context_summary", ""),
+        market_context_summary="\n".join(
+            [state.get("market_context_summary", ""), *blueprint_questions]
+        ).strip(),
         evidence_refs=evidence_refs,
         required_metric_families=list(LGES_REQUIRED_METRIC_FAMILIES),
     )
@@ -31,13 +41,17 @@ def lges_analysis_agent(state: AgentState) -> AgentState:
             config=config,
             prompt=prompt,
             response_model=LGESFactExtractionOutput,
+            max_output_tokens=max(config.openai_max_output_tokens, 4000),
         )
         lges_facts = LGESFactExtractionOutput.model_validate(extracted_output)
     except (StructuredOutputError, ValidationError) as exc:
-        return {
-            "status": "failed",
-            "last_error": str(exc),
-        }
+        try:
+            lges_facts = build_lges_fallback_facts(evidence_refs)
+        except (ValidationError, ValueError) as fallback_exc:
+            return {
+                "status": "failed",
+                "last_error": f"{exc} | fallback failed: {fallback_exc}",
+            }
 
     validation = validate_fact_extraction_output("lges", lges_facts)
     if validation.hard_errors:
@@ -83,10 +97,18 @@ def _retrieve_lges_evidence(state: AgentState, retriever) -> list[EvidenceRef]:
     ]
     evidence_map: dict[str, EvidenceRef] = {}
     for query in queries:
-        for hit in retriever.retrieve(query, scope="lges", top_k=6):
+        for hit in retriever.retrieve(query, scope="lges", top_k=4):
             if hit.chunk_id:
                 evidence_map[hit.chunk_id] = hit
-    return list(evidence_map.values())
+    ranked = sorted(
+        evidence_map.values(),
+        key=lambda hit: (
+            -(hit.score if hit.score is not None else float("-inf")),
+            hit.page if hit.page is not None else 10**9,
+            hit.chunk_id or "",
+        ),
+    )
+    return ranked[:10]
 
 
 def _load_retriever(config):

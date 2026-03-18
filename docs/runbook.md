@@ -79,10 +79,14 @@
   - `tests/test_acceptance_suite.py`
 
 ## Manual Submission Checklist
+- `Supervisor Blueprint -> Workers -> Supervisor Synthesis -> Review -> Export` 순서가 로그에 보이는지 확인
+- worker 출력이 최종 요약/최종 판단 문장을 직접 담고 있지 않은지 확인
+- 최종 보고서의 Summary, SWOT, Scorecard, 종합 판단이 supervisor-owned fields에서 렌더링되는지 확인
 - 회색 면이나 장식용 배경이 본문 가독성을 해치지 않는지 확인
 - 표지 이후 본문 페이지에 큰 공백만 남는 페이지가 없는지 확인
 - 표가 페이지 경계에서 잘려도 읽을 수 있게 유지되는지 확인
-- `Revenue Trend`, `Reported Profitability` 두 차트가 모두 보이는지 확인
+- 단일 시점 차트에 `Trend`라는 제목이 남아 있지 않은지 확인
+- 직접 비교 불가 지표가 본표가 아니라 `참고 지표표`에 있는지 확인
 - `종합 판단` 섹션이 결론 흐름을 마무리하고 `Reference`가 별도 부록처럼 끝나는지 확인
 - citation, score rationale, final judgment가 서로 같은 근거를 가리키는지 확인
 

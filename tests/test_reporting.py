@@ -3,9 +3,11 @@ import re
 
 import pytest
 
+from state import AtomicFactClaim, MarketFactExtractionOutput
 from tools.reporting import (
     assemble_html_report,
     assemble_markdown_report,
+    build_report_spec,
     export_html_report,
     export_markdown_report,
     export_pdf_report,
@@ -19,15 +21,20 @@ def test_assemble_markdown_report_includes_required_sections_in_order(sample_sta
     assert "LG Energy Solution" in markdown
     assert "CATL" in markdown
     section_order = [
-        "## Summary",
+        "## Executive Summary",
+        "## 비교 프레임과 방법",
         "## 시장 배경",
-        "## LGES",
-        "## CATL",
-        "## 정량 비교표",
-        "## 차트",
+        "## LGES 전략 요약",
+        "## CATL 전략 요약",
+        "## Quick Comparison",
+        "## 직접 비교표",
+        "## 참고 지표표",
+        "## 차트와 해석",
         "## SWOT",
         "## Scorecard",
         "## 종합 판단",
+        "## 시사점",
+        "## 한계와 주의사항",
         "## Reference",
     ]
     positions = [markdown.index(section) for section in section_order]
@@ -67,7 +74,7 @@ def test_assemble_html_report_includes_structured_sections(sample_state):
     assert "LG Energy Solution" in html
     assert "Sample LGES Deck" in html
     assert "Sample CATL Prospectus" in html
-    assert ">차트<" in html
+    assert ">차트와 해석<" in html
 
 
 def test_assemble_html_report_uses_pdf_document_template(sample_state):
@@ -105,6 +112,30 @@ def test_assemble_report_requires_final_judgment(sample_state):
 
     with pytest.raises(ValueError, match="Final judgment is required"):
         assemble_markdown_report(state)
+
+
+def test_build_report_spec_dedupes_duplicate_claim_ids(sample_state):
+    state = dict(sample_state)
+    market_ref = state["market_context"].evidence_refs[0]
+    market_claim = AtomicFactClaim(
+        scope="market",
+        category="market_overview",
+        ordinal=1,
+        claim_text="시장 수요가 지역화되고 있다.",
+        evidence_refs=[market_ref],
+    )
+    state["market_facts"] = MarketFactExtractionOutput(
+        scope="market",
+        summary="시장 요약",
+        atomic_claims=[market_claim, market_claim],
+        metric_claims=[],
+        source_evidence_refs=[market_ref],
+    )
+
+    report_spec = build_report_spec(state)
+
+    claim_ids = [claim.claim_id for claim in report_spec.atomic_claims]
+    assert len(claim_ids) == len(set(claim_ids))
 
 
 def test_export_html_report_writes_file(sample_state, tmp_path: Path):

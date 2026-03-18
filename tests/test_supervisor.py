@@ -44,9 +44,9 @@ def test_supervisor_routes_review_revision_and_clears_downstream_outputs(sample_
 
     assert routed["current_step"] == "comparison"
     assert routed["review_retry_count"] == 1
-    assert routed["comparison_matrix"] == []
-    assert routed["charts"] == []
-    assert routed["scorecard"] == []
+    assert routed["selected_comparison_rows"] == []
+    assert routed["chart_selection"] == []
+    assert routed["supervisor_score_rationales"] == []
     assert "revision" in routed["routing_reason"].lower()
 
 
@@ -70,7 +70,7 @@ def test_supervisor_stops_after_single_schema_retry_even_if_budget_is_higher(sam
     assert routed["status"] == "failed"
 
 
-def test_supervisor_stops_after_single_review_retry_even_if_budget_is_higher(sample_state):
+def test_supervisor_completes_with_advisory_review_issues_after_single_retry(sample_state):
     state = deepcopy(sample_state)
     state["review_result"] = ReviewResult(
         passed=False,
@@ -83,4 +83,4 @@ def test_supervisor_stops_after_single_review_retry_even_if_budget_is_higher(sam
     routed = supervisor_agent(state)
 
     assert routed["current_step"] == "finish"
-    assert routed["status"] == "failed"
+    assert routed["status"] == "completed"

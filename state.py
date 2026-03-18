@@ -11,10 +11,12 @@ if TYPE_CHECKING:
 
 
 WorkflowStep = Literal[
+    "supervisor_blueprint",
     "market_research",
     "lges_analysis",
     "catl_analysis",
     "comparison",
+    "supervisor_synthesis",
     "review",
     "finish",
 ]
@@ -29,10 +31,12 @@ WorkflowStatus = Literal[
 ]
 
 RevisionTarget = Literal[
+    "supervisor_blueprint",
     "market_research",
     "lges_analysis",
     "catl_analysis",
     "comparison",
+    "supervisor_synthesis",
 ]
 
 SourceType = Literal[
@@ -48,6 +52,13 @@ CompanyScope = Literal["market", "lges", "catl", "shared"]
 RetrievalScope = Literal["market", "lges", "catl", "cross_check"]
 ClaimScope = Literal["market", "lges", "catl"]
 ConfidenceLevel = Literal["high", "medium", "low"]
+ComparisonAxis = Literal[
+    "portfolio_diversification",
+    "technology_product_strategy",
+    "regional_supply_chain",
+    "financial_resilience",
+]
+ComparabilityStatus = Literal["direct", "reference_only", "reject"]
 
 _CLAIM_CATEGORY_PATTERN = re.compile(r"[^a-z0-9]+")
 
@@ -133,6 +144,59 @@ class MarketContext(BaseModel):
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
 
 
+class ComparabilityPrecheckRow(BaseModel):
+    metric_name: str = Field(min_length=1)
+    company_scope: Literal["lges", "catl", "shared"] = "shared"
+    period: str | None = None
+    status: ComparabilityStatus
+    reason: str = Field(min_length=1)
+
+
+class WorkerTaskSpec(BaseModel):
+    worker_id: Literal["market_research", "lges_analysis", "catl_analysis"]
+    question_set: list[str] = Field(default_factory=list, min_length=1)
+    required_output_fields: list[str] = Field(default_factory=list, min_length=1)
+    forbidden_outputs: list[str] = Field(default_factory=list, min_length=1)
+
+
+class ReportBlueprint(BaseModel):
+    comparison_axes: list[ComparisonAxis] = Field(default_factory=list, min_length=4, max_length=4)
+    comparability_precheck: list[ComparabilityPrecheckRow] = Field(default_factory=list, min_length=1)
+    worker_task_specs: list[WorkerTaskSpec] = Field(default_factory=list, min_length=3)
+
+    @model_validator(mode="after")
+    def _validate_required_fields(self) -> "ReportBlueprint":
+        expected_axes = [
+            "portfolio_diversification",
+            "technology_product_strategy",
+            "regional_supply_chain",
+            "financial_resilience",
+        ]
+        if self.comparison_axes != expected_axes:
+            raise ValueError(
+                "comparison_axes must exactly match the required fixed order: "
+                + ", ".join(expected_axes)
+            )
+        required_forbidden = {
+            "final_judgment",
+            "executive_summary",
+            "final_swot",
+            "final_score_rationale",
+        }
+        worker_ids = {item.worker_id for item in self.worker_task_specs}
+        if worker_ids != {"market_research", "lges_analysis", "catl_analysis"}:
+            raise ValueError(
+                "worker_task_specs must define exactly market_research, lges_analysis, and catl_analysis."
+            )
+        for item in self.worker_task_specs:
+            if not required_forbidden.issubset(set(item.forbidden_outputs)):
+                missing = sorted(required_forbidden - set(item.forbidden_outputs))
+                raise ValueError(
+                    f"worker_task_spec '{item.worker_id}' is missing required forbidden outputs: {', '.join(missing)}"
+                )
+        return self
+
+
 class ClaimBase(BaseModel):
     scope: ClaimScope
     category: str = Field(min_length=1)
@@ -210,6 +274,8 @@ class MetricComparisonRow(BaseModel):
     lges_value: str | None = None
     catl_value: str | None = None
     basis_note: str | None = None
+    comparability_status: ComparabilityStatus | None = None
+    interpretation: str | None = None
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
 
 
@@ -225,10 +291,21 @@ class ChartSpec(BaseModel):
     series: list[ChartSeries] = Field(default_factory=list)
     x_axis_periods: list[str] = Field(default_factory=list)
     y_axis_label: str = Field(min_length=1)
+    interpretation: str | None = None
+    caution_note: str | None = None
 
 
 class ReportSpec(BaseModel):
     title: str = Field(min_length=1)
+    executive_summary: list[str] = Field(default_factory=list)
+    comparison_framework: list[str] = Field(default_factory=list)
+    lges_strategy_summary: list[str] = Field(default_factory=list)
+    catl_strategy_summary: list[str] = Field(default_factory=list)
+    quick_comparison_panel: list["ComparisonRow"] = Field(default_factory=list)
+    selected_comparison_rows: list[MetricComparisonRow] = Field(default_factory=list)
+    reference_only_rows: list[MetricComparisonRow] = Field(default_factory=list)
+    implications: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
     atomic_claims: list[AtomicFactClaim] = Field(default_factory=list)
     metric_claims: list[MetricFactClaim] = Field(default_factory=list)
     synthesis_claims: list[SynthesisClaim] = Field(default_factory=list)
@@ -410,6 +487,13 @@ class StructuredComparisonOutput(BaseModel):
     low_confidence_claims: list[ClaimTrace] = Field(default_factory=list)
 
 
+class ComparisonEvidenceOutput(BaseModel):
+    synthesis_claims: list[SynthesisClaim] = Field(default_factory=list)
+    score_criteria: list[ScoreCriterion] = Field(default_factory=list)
+    metric_comparison_rows: list[MetricComparisonRow] = Field(default_factory=list)
+    low_confidence_claims: list[ClaimTrace] = Field(default_factory=list)
+
+
 class FinancialIndicator(BaseModel):
     metric: str
     value: str
@@ -483,6 +567,7 @@ class AgentState(TypedDict, total=False):
     document_manifest: list[DocumentRef]
     preprocessing_summary: PreprocessingSummary
     retrieval_handles: dict[str, str]
+    report_blueprint: ReportBlueprint
     market_facts: MarketFactExtractionOutput
     lges_facts: LGESFactExtractionOutput
     catl_facts: CATLFactExtractionOutput
@@ -492,9 +577,20 @@ class AgentState(TypedDict, total=False):
     comparison_input_spec: ComparisonInputSpec
     synthesis_claims: list[SynthesisClaim]
     score_criteria: list[ScoreCriterion]
+    comparability_decisions: list[MetricComparisonRow]
     final_judgment: FinalJudgment
     metric_comparison_rows: list[MetricComparisonRow]
     charts: list[ChartSpec]
+    selected_comparison_rows: list[MetricComparisonRow]
+    reference_only_rows: list[MetricComparisonRow]
+    chart_selection: list[ChartSpec]
+    executive_summary: list[str]
+    company_strategy_summaries: dict[str, list[str]]
+    quick_comparison_panel: list[ComparisonRow]
+    supervisor_swot: list[SwotEntry]
+    supervisor_score_rationales: list[ScoreCriterion]
+    implications: list[str]
+    limitations: list[str]
     report_spec: ReportSpec
     market_context: MarketContext
     market_context_summary: str
@@ -549,9 +645,20 @@ def build_initial_state(
             chunk_count=0,
         ),
         "retrieval_handles": retrieval_handles or {},
+        "executive_summary": [],
+        "company_strategy_summaries": {},
+        "quick_comparison_panel": [],
         "citation_refs": [],
         "charts": [],
+        "chart_selection": [],
+        "comparability_decisions": [],
         "low_confidence_claims": [],
+        "reference_only_rows": [],
+        "selected_comparison_rows": [],
+        "supervisor_score_rationales": [],
+        "supervisor_swot": [],
+        "implications": [],
+        "limitations": [],
         "review_issues": [],
         "validation_warnings": [],
         "retry_budget": RetryBudget(
@@ -569,7 +676,7 @@ def build_initial_state(
         "execution_log": [log_entry],
         "schema_retry_count": 0,
         "review_retry_count": 0,
-        "current_step": "market_research",
+        "current_step": "supervisor_blueprint",
         "routing_reason": None,
         "status": "initialized",
         "last_error": None,

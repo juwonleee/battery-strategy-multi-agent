@@ -4,6 +4,7 @@ from agents.comparison import comparison_agent
 from agents.review import review_agent
 from state import (
     AtomicFactClaim,
+    ComparisonEvidenceOutput,
     CompanyClaimCatalog,
     ComparisonInputClaim,
     ComparisonInputSpec,
@@ -12,10 +13,10 @@ from state import (
     MarketFactExtractionOutput,
     MetricComparisonRow,
     ScoreCriterion,
-    StructuredComparisonOutput,
     SwotEntry,
     SynthesisClaim,
 )
+from tools.openai_client import StructuredOutputError
 from tools.validation import (
     validate_comparison_outputs,
     validate_fact_extraction_output,
@@ -60,7 +61,7 @@ def test_validate_comparison_outputs_fails_for_insufficient_support_and_missing_
         supporting_claim_ids=["lges-capex-1"],
         evidence_refs=[],
     )
-    output = StructuredComparisonOutput(
+    output = ComparisonEvidenceOutput(
         synthesis_claims=[
             SynthesisClaim(
                 scope="catl",
@@ -71,11 +72,6 @@ def test_validate_comparison_outputs_fails_for_insufficient_support_and_missing_
             )
         ],
         score_criteria=[invalid_score],
-        swot_matrix=_swot_entries(),
-        final_judgment=FinalJudgment(
-            judgment_text="CATL이 상대적으로 우위다.",
-            supporting_claim_ids=["lges-capex-1", "catl-revenue-1"],
-        ),
         metric_comparison_rows=[_metric_row()],
     )
 
@@ -105,7 +101,7 @@ def test_validate_final_delivery_state_blocks_fallback_ref_backfill(sample_state
 
 def test_validate_final_delivery_state_requires_required_chart_ids(sample_state):
     state = deepcopy(sample_state)
-    state["charts"] = []
+    state["chart_selection"] = []
 
     result = validate_final_delivery_state(state)
 
@@ -124,7 +120,9 @@ def test_validate_final_delivery_state_emits_soft_warnings_only(sample_state):
     assert any("basis mismatch note" in warning for warning in result.soft_warnings)
 
 
-def test_comparison_agent_surfaces_hard_gate_failure(monkeypatch, sample_state):
+def test_comparison_agent_recovers_with_fallback_after_hard_gate_failure(
+    monkeypatch, sample_state
+):
     valid_input_spec = _comparison_input_spec()
     comparison_ref = EvidenceRef(document_id="catl-001", chunk_id="catl-001-p006-c02", page=6)
 
@@ -132,11 +130,9 @@ def test_comparison_agent_surfaces_hard_gate_failure(monkeypatch, sample_state):
         "agents.comparison.build_comparison_input_spec",
         lambda _state: valid_input_spec,
     )
-    monkeypatch.setattr("agents.comparison.build_chart_specs", lambda **_kwargs: ["stub"])
-    monkeypatch.setattr("agents.comparison.missing_required_chart_ids", lambda _charts: [])
     monkeypatch.setattr(
         "agents.comparison.invoke_structured_output",
-        lambda **_kwargs: StructuredComparisonOutput(
+        lambda **_kwargs: ComparisonEvidenceOutput(
             synthesis_claims=[
                 SynthesisClaim(
                     scope="catl",
@@ -156,19 +152,109 @@ def test_comparison_agent_surfaces_hard_gate_failure(monkeypatch, sample_state):
                     evidence_refs=[comparison_ref],
                 )
             ],
-            swot_matrix=_swot_entries(),
-            final_judgment=FinalJudgment(
-                judgment_text="CATL이 더 넓은 선택지를 보유한다.",
-                supporting_claim_ids=["lges-capex-1", "catl-revenue-1"],
-            ),
             metric_comparison_rows=[_metric_row()],
         ),
     )
 
     result = comparison_agent(sample_state)
 
-    assert result["status"] == "failed"
-    assert result["last_error"].startswith("[hard-gate:synthesis-support-count]")
+    assert result["status"] == "running"
+    assert result["last_error"] is None
+    assert "final_judgment" not in result
+
+
+def test_comparison_agent_merges_required_profitability_rows_for_charting(
+    monkeypatch,
+    sample_state,
+):
+    sample_state["profitability_reported_rows"] = [
+        MetricComparisonRow(
+            row_id="profitability_lges",
+            row_group="profitability_reported",
+            metric_name="operating_margin",
+            period="FY2025",
+            lges_value="7.2%",
+            catl_value=None,
+            basis_note="LGES reported basis",
+            evidence_refs=[EvidenceRef(document_id="lges-001", chunk_id="lges-001-p003-c01", page=3)],
+        ),
+        MetricComparisonRow(
+            row_id="profitability_catl",
+            row_group="profitability_reported",
+            metric_name="net_profit_margin",
+            period="FY2024",
+            lges_value=None,
+            catl_value="11%",
+            basis_note="CATL reported basis",
+            evidence_refs=[EvidenceRef(document_id="catl-001", chunk_id="catl-001-p008-c01", page=8)],
+        ),
+    ]
+    valid_input_spec = _comparison_input_spec()
+    captured = {}
+
+    monkeypatch.setattr(
+        "agents.comparison.build_comparison_input_spec",
+        lambda _state: valid_input_spec,
+    )
+
+    monkeypatch.setattr(
+        "agents.comparison.invoke_structured_output",
+        lambda **_kwargs: ComparisonEvidenceOutput(
+            synthesis_claims=[
+                SynthesisClaim(
+                    scope="catl",
+                    category="portfolio_advantage",
+                    ordinal=1,
+                    claim_text="CATL의 포트폴리오 선택지가 더 넓다.",
+                    supporting_claim_ids=["lges-capex-1", "catl-revenue-1"],
+                )
+            ],
+            score_criteria=[
+                ScoreCriterion(
+                    criterion_key="diversification_strength",
+                    company_scope="catl",
+                    score=5,
+                    rationale="정량 근거 기반 점수다.",
+                    supporting_claim_ids=["lges-capex-1", "catl-revenue-1"],
+                    evidence_refs=[EvidenceRef(document_id="catl-001", chunk_id="catl-001-p006-c02", page=6)],
+                )
+            ],
+            metric_comparison_rows=[_metric_row()],
+        ),
+    )
+
+    result = comparison_agent(sample_state)
+
+    assert result["status"] == "running"
+    assert any(
+        row.row_group == "profitability_reported"
+        for row in result["metric_comparison_rows"]
+    )
+
+
+def test_comparison_agent_uses_fallback_output_when_structured_call_fails(
+    monkeypatch,
+    sample_state,
+):
+    valid_input_spec = _comparison_input_spec()
+
+    monkeypatch.setattr(
+        "agents.comparison.build_comparison_input_spec",
+        lambda _state: valid_input_spec,
+    )
+    monkeypatch.setattr(
+        "agents.comparison.invoke_structured_output",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            StructuredOutputError("forced comparison failure")
+        ),
+    )
+
+    result = comparison_agent(sample_state)
+
+    assert result["status"] == "running"
+    assert result["synthesis_claims"]
+    assert result["score_criteria"]
+    assert result["comparison_matrix"]
 
 
 def test_review_agent_fails_when_final_hard_gate_fails(monkeypatch, sample_state):
@@ -240,6 +326,15 @@ def _comparison_input_spec() -> ComparisonInputSpec:
                     key_value="KRW 10tn",
                     source_label="Sample LGES Deck",
                     page_locator="p.3",
+                ),
+                ComparisonInputClaim(
+                    claim_id="lges-diversification_strategy-2",
+                    scope="lges",
+                    category="diversification_strategy",
+                    claim_text="LGES는 ESS 포트폴리오를 확장한다.",
+                    key_value=None,
+                    source_label="Sample LGES Deck",
+                    page_locator="p.7",
                 )
             ],
         ),
@@ -254,6 +349,15 @@ def _comparison_input_spec() -> ComparisonInputSpec:
                     key_value="CNY 400bn",
                     source_label="Sample CATL Prospectus",
                     page_locator="p.5",
+                ),
+                ComparisonInputClaim(
+                    claim_id="catl-diversification_strategy-2",
+                    scope="catl",
+                    category="diversification_strategy",
+                    claim_text="CATL은 EV와 ESS를 동시에 확대한다.",
+                    key_value=None,
+                    source_label="Sample CATL Prospectus",
+                    page_locator="p.46",
                 )
             ],
         ),

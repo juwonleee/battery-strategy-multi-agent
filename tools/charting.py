@@ -6,8 +6,7 @@ from state import ChartSeries, ChartSpec, MetricComparisonRow, NormalizedMetric
 
 
 REQUIRED_CHART_IDS = (
-    "revenue_trend",
-    "profitability_reported",
+    "revenue_comparison",
 )
 
 _NUMERIC_PATTERN = re.compile(r"-?\d+(?:,\d{3})*(?:\.\d+)?")
@@ -52,8 +51,8 @@ def _build_revenue_trend_chart(
         return None
 
     return ChartSpec(
-        chart_id="revenue_trend",
-        title="Revenue Trend",
+        chart_id="revenue_comparison",
+        title="Revenue Comparison" if len(periods) <= 1 else "Revenue Trend",
         series=[
             ChartSeries(
                 label="LGES Revenue",
@@ -76,6 +75,12 @@ def _build_revenue_trend_chart(
         ],
         x_axis_periods=periods,
         y_axis_label=_resolve_revenue_axis_label(lges_revenue, catl_revenue),
+        interpretation="Reported revenue scale comparison across available periods.",
+        caution_note=(
+            "단일 시점이면 추세가 아니라 snapshot 비교로 해석해야 한다."
+            if len(periods) <= 1
+            else None
+        ),
     )
 
 
@@ -93,6 +98,8 @@ def _build_profitability_reported_chart(
         owner="catl",
     )
     if lges_row is None or catl_row is None:
+        return None
+    if (lges_row.lges_value and not lges_row.catl_value) or (catl_row.catl_value and not catl_row.lges_value):
         return None
 
     periods = [period for period in [lges_row.period, catl_row.period] if period]
@@ -123,6 +130,8 @@ def _build_profitability_reported_chart(
         ],
         x_axis_periods=ordered_periods,
         y_axis_label="Margin (%)",
+        interpretation="Basis-aligned reported profitability comparison.",
+        caution_note="기준이 다르면 별도 참고 지표표로 분리해야 한다.",
     )
 
 

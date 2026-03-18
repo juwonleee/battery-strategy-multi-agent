@@ -6,11 +6,13 @@ from dataclasses import dataclass
 from state import (
     ClaimTrace,
     ComparisonRow,
+    ComparisonEvidenceOutput,
     ComparisonInputSpec,
     CompanyProfile,
     EvidenceRef,
     FinalJudgment,
     MarketContext,
+    ReportBlueprint,
     ReportSpec,
     ReviewResult,
     Scorecard,
@@ -63,6 +65,7 @@ def build_market_research_prompt(
                 COMMON_GUARDRAILS,
                 "MarketFactExtractionOutput 객체를 반환한다.",
                 "자유형 시장 보고서가 아니라 1차 fact extraction만 수행한다.",
+                "최종 보고서 문장, executive summary, final judgment, final SWOT prose를 작성하지 않는다.",
                 "summary는 선택 필드이며 한두 문장 한국어 요약으로만 작성한다.",
                 "atomic_claims의 category는 market_overview, demand_signal, policy_signal, risk_signal, comparison_axis 중 하나만 사용한다.",
                 "comparison_axis category claim은 두 기업 모두에 재사용 가능한 짧은 한국어 비교 축으로 작성한다.",
@@ -97,7 +100,7 @@ def build_company_analysis_prompt(
             f"시장 요약:\n{market_context_summary or '정보 부족'}",
             "필수 metric family:\n" + "\n".join(f"- {item}" for item in required_metric_families),
             f"CATL raw page 힌트:\n{raw_page_text}",
-            "근거:\n" + serialize_evidence_refs(evidence_refs),
+            "근거:\n" + serialize_evidence_refs(evidence_refs, snippet_limit=220),
         ]
     )
     return PromptBundle(
@@ -107,6 +110,7 @@ def build_company_analysis_prompt(
                 COMMON_GUARDRAILS,
                 f"{company_scope.upper()}FactExtractionOutput 객체를 반환한다.",
                 "자유형 company profile을 쓰지 말고 1차 fact extraction만 수행한다.",
+                "최종 요약, 최종 종합 판단, 최종 SWOT prose, 최종 score rationale은 작성하지 않는다.",
                 "summary는 선택 필드이며 한두 문장 한국어 요약으로만 작성한다.",
                 (
                     "atomic_claims category 규칙:\n"
@@ -121,11 +125,15 @@ def build_company_analysis_prompt(
                 (
                     "metric_claims 작성 규칙:\n"
                     f"- category는 다음 필수 family 식별자 중 하나를 사용해야 한다: {', '.join(required_metric_families)}\n"
+                    f"- 위 필수 family는 각각 최소 1개 이상 반드시 포함해야 한다.\n"
+                    "- 필수 family를 하나라도 누락하면 실패로 간주한다.\n"
                     "- metric_name은 문서 표기 원문 이름을 최대한 유지한다.\n"
                     "- value는 숫자 또는 짧은 원문 값을 사용한다.\n"
                     "- reported_basis, period, unit은 문서에 있을 때만 채운다.\n"
-                    "- 각 metric_claim에는 evidence_refs를 최소 1개 포함한다."
+                    "- 각 metric_claim에는 evidence_refs를 최소 1개 포함한다.\n"
+                    "- 불필요하게 많은 metric_claim를 만들지 말고 필수 family 중심으로 간결하게 작성한다."
                 ),
+                "atomic_claims는 핵심 주장만 6개 이하로 제한한다.",
                 "source_evidence_refs에는 실제로 사용한 상위 근거 ref만 넣는다.",
                 (
                     "CATL인 경우 raw financial extraction 규칙:\n"
@@ -152,16 +160,44 @@ def build_comparison_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "StructuredComparisonOutput 객체를 반환한다.",
-                "입력으로 제공된 claim catalog만 사용해 2차 패스 비교를 수행한다.",
+                "ComparisonEvidenceOutput 객체를 반환한다.",
+                "입력으로 제공된 claim catalog만 사용해 supervisor synthesis를 위한 candidate evidence packet만 생성한다.",
+                "최종 보고서 문장, final_judgment, final SWOT, 최종 scorecard rationale은 작성하지 않는다.",
                 "raw evidence snippet이나 추가 검색 결과를 상정하지 말고, claim_id/claim_text/key_value/source_label/page_locator만 사용한다.",
+                "synthesis_claims에는 claim_id 필드를 직접 쓰지 말고 생략한다. 코드가 deterministic claim_id를 자동 생성한다.",
                 "3~5개의 synthesis_claim을 만들고 각 claim에는 supporting_claim_ids를 반드시 채운다.",
                 "metric_comparison_rows는 claim catalog에서 직접 비교 가능한 수치/축만 사용한다.",
-                "SWOT entry는 정확히 2개여야 하며 LG Energy Solution 1개, CATL 1개를 만든다.",
                 "score_criteria는 criterion_key를 diversification_strength, cost_competitiveness, market_adaptability, risk_exposure 중 하나로 사용한다.",
                 "ScoreCriterion의 company_scope는 lges 또는 catl만 사용하고, evidence_refs는 supporting_claim_ids에서 상속하지 말고 materialized field로 직접 채운다.",
-                "final_judgment에는 supporting_claim_ids를 반드시 채운다.",
                 "근거가 약하거나 불완전하면 추정하지 말고 low_confidence_claims에 ClaimTrace를 추가한다.",
+            ]
+        ),
+        input_text=json.dumps(payload, ensure_ascii=False, indent=2),
+    )
+
+
+def build_supervisor_blueprint_prompt(
+    *,
+    goal: str,
+    target_companies: list[str],
+    source_documents: list[dict[str, object]],
+) -> PromptBundle:
+    payload = {
+        "goal": goal,
+        "target_companies": target_companies,
+        "source_documents": source_documents,
+    }
+    return PromptBundle(
+        name="supervisor_blueprint",
+        instructions="\n\n".join(
+            [
+                COMMON_GUARDRAILS,
+                "ReportBlueprint 객체를 반환한다.",
+                "comparison_axes는 정확히 4개이며 다음 fixed order를 반드시 유지한다: portfolio_diversification, technology_product_strategy, regional_supply_chain, financial_resilience.",
+                "comparability_precheck는 직접 비교 가능 여부를 metric 단위로 사전 판단한다.",
+                "worker_task_specs는 market_research, lges_analysis, catl_analysis 세 worker만 정의한다.",
+                "worker_task_specs의 forbidden_outputs에는 final_judgment, executive_summary, final_swot, final_score_rationale를 반드시 포함한다.",
+                "결과 형식을 worker에게 위임하지 말고 evidence extraction 질문만 작성한다.",
             ]
         ),
         input_text=json.dumps(payload, ensure_ascii=False, indent=2),
@@ -201,7 +237,7 @@ def build_review_prompt(
                 "근거 연결이 약하거나 비교 축이 불일치하거나 score rationale이 근거로 뒷받침되지 않으면 passed=false로 표시한다.",
                 "report_spec의 charts, metric_comparison_rows, score_criteria, final_judgment, references를 함께 대조해 누락/불일치 여부를 찾는다.",
                 "validation_warnings가 제공되면 이를 참고하되 그대로 복사하지 말고 실제 검토 결과로 재기술한다.",
-                "revision target이 필요하면 market_research, lges_analysis, catl_analysis, comparison 중 하나를 사용한다.",
+                "revision target이 필요하면 supervisor_synthesis, market_research, lges_analysis, catl_analysis, comparison 중 하나를 사용한다.",
             ]
         ),
         input_text=json.dumps(payload, ensure_ascii=False, indent=2),

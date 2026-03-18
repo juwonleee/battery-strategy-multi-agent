@@ -8,14 +8,18 @@ from agents.lges_analysis import lges_analysis_agent
 from agents.market_research import market_research_agent
 from agents.review import review_agent
 from agents.supervisor import supervisor_agent
+from agents.supervisor_blueprint import supervisor_blueprint_agent
+from agents.supervisor_synthesis import supervisor_synthesis_agent
 from state import AgentState, WorkflowStep, append_execution_log
 
 
 AGENT_REGISTRY: dict[WorkflowStep, Callable[[AgentState], AgentState]] = {
+    "supervisor_blueprint": supervisor_blueprint_agent,
     "market_research": market_research_agent,
     "lges_analysis": lges_analysis_agent,
     "catl_analysis": catl_analysis_agent,
     "comparison": comparison_agent,
+    "supervisor_synthesis": supervisor_synthesis_agent,
     "review": review_agent,
 }
 

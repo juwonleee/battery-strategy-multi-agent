@@ -1,21 +1,22 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from state import (
     AgentState,
     AtomicFactClaim,
     CATLFactExtractionOutput,
     ClaimTrace,
+    ComparisonEvidenceOutput,
     ComparisonInputClaim,
     ComparisonInputSpec,
     ComparisonRow,
     CompanyClaimCatalog,
-    FinalJudgment,
     LGESFactExtractionOutput,
     MetricComparisonRow,
     MetricFactClaim,
     ScoreCriterion,
     Scorecard,
-    StructuredComparisonOutput,
 )
 
 
@@ -115,8 +116,8 @@ def validate_structured_comparison_output(
 
 
 def build_legacy_comparison_artifacts(
-    output: StructuredComparisonOutput,
-) -> dict[str, list | FinalJudgment]:
+    output: ComparisonEvidenceOutput,
+) -> dict[str, list]:
     comparison_matrix = [
         ComparisonRow(
             strategy_axis=_humanize_metric_name(row.metric_name),
@@ -129,12 +130,8 @@ def build_legacy_comparison_artifacts(
         for row in output.metric_comparison_rows
     ]
 
-    scorecards = _build_scorecards(output.score_criteria)
     return {
         "comparison_matrix": comparison_matrix,
-        "swot_matrix": output.swot_matrix,
-        "scorecard": scorecards,
-        "final_judgment": output.final_judgment,
     }
 
 
@@ -236,9 +233,28 @@ def _to_input_claim(
         category=claim.category,
         claim_text=claim.claim_text,
         key_value=key_value,
-        source_label=document_labels.get(primary_ref.document_id, primary_ref.document_id),
+        source_label=_resolve_source_label(primary_ref, document_labels),
         page_locator=page_locator,
     )
+
+
+def _resolve_source_label(primary_ref, document_labels: dict[str, str]) -> str:
+    labeled_title = document_labels.get(primary_ref.document_id or "", "").strip()
+    if labeled_title:
+        return labeled_title
+
+    document_id = (primary_ref.document_id or "").strip()
+    if document_id:
+        return document_id
+
+    source_path = (primary_ref.source_path or "").strip()
+    if source_path:
+        return Path(source_path).name
+
+    if primary_ref.page is not None:
+        return f"page-{primary_ref.page}"
+
+    return "unknown-source"
 
 
 def _invalid_supporting_claim_ids(

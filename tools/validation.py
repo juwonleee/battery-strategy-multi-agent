@@ -7,11 +7,13 @@ from state import (
     AgentState,
     CATL_REQUIRED_METRIC_FAMILIES,
     CATL_REQUIRED_RAW_METRIC_FAMILIES,
+    ComparisonEvidenceOutput,
     LGES_REQUIRED_METRIC_FAMILIES,
     CATLFactExtractionOutput,
     FactExtractionOutput,
     LGESFactExtractionOutput,
     MetricFactClaim,
+    ReportBlueprint,
     StructuredComparisonOutput,
 )
 
@@ -78,7 +80,7 @@ def validate_fact_extraction_output(
 
 def validate_comparison_outputs(
     state: AgentState,
-    output: StructuredComparisonOutput,
+    output: ComparisonEvidenceOutput,
 ) -> ValidationResult:
     result = ValidationResult()
     allowed_claim_ids = (
@@ -113,44 +115,37 @@ def validate_comparison_outputs(
             label=f"ScoreCriterion '{criterion.criterion_key}'",
         )
 
-    if len(output.final_judgment.supporting_claim_ids) < 2:
-        result.add_hard_error(
-            "final-judgment-support-count",
-            "FinalJudgment must reference at least two supporting_claim_ids.",
-        )
-    _validate_allowed_supporting_claim_ids(
-        result,
-        supporting_claim_ids=output.final_judgment.supporting_claim_ids,
-        allowed_claim_ids=allowed_claim_ids,
-        label="FinalJudgment",
-    )
-
-    if not state.get("comparison_matrix"):
-        result.add_hard_error(
-            "comparison-matrix-missing",
-            "comparison_matrix is required for final comparison delivery.",
-        )
-    if not state.get("swot_matrix"):
-        result.add_hard_error(
-            "swot-matrix-missing",
-            "swot_matrix is required for final comparison delivery.",
-        )
-    if not state.get("scorecard"):
-        result.add_hard_error(
-            "scorecard-missing",
-            "scorecard is required for final comparison delivery.",
-        )
     if not output.metric_comparison_rows:
         result.add_hard_error(
             "metric-comparison-rows-missing",
-            "metric_comparison_rows is required for final comparison delivery.",
-        )
-    if not output.final_judgment.judgment_text.strip():
-        result.add_hard_error(
-            "final-judgment-missing",
-            "final_judgment is required for final comparison delivery.",
+            "metric_comparison_rows is required for supervisor synthesis input.",
         )
 
+    return result
+
+
+def validate_report_blueprint(blueprint: ReportBlueprint) -> ValidationResult:
+    result = ValidationResult()
+    try:
+        ReportBlueprint.model_validate(blueprint.model_dump(mode="json"))
+    except Exception as exc:
+        result.add_hard_error("blueprint-invalid", str(exc))
+        return result
+    if len(blueprint.comparison_axes) != 4:
+        result.add_hard_error(
+            "blueprint-comparison-axes",
+            "comparison_axes must contain exactly four required axes.",
+        )
+    if not blueprint.comparability_precheck:
+        result.add_hard_error(
+            "blueprint-comparability-precheck",
+            "comparability_precheck is required before worker routing.",
+        )
+    if not blueprint.worker_task_specs:
+        result.add_hard_error(
+            "blueprint-worker-task-specs",
+            "worker_task_specs is required before worker routing.",
+        )
     return result
 
 
@@ -161,13 +156,16 @@ def validate_final_delivery_state(state: AgentState) -> ValidationResult:
         ("market_context", state.get("market_context")),
         ("lges_profile", state.get("lges_profile")),
         ("catl_profile", state.get("catl_profile")),
-        ("comparison_matrix", state.get("comparison_matrix")),
-        ("swot_matrix", state.get("swot_matrix")),
-        ("scorecard", state.get("scorecard")),
+        ("report_blueprint", state.get("report_blueprint")),
         ("synthesis_claims", state.get("synthesis_claims")),
-        ("score_criteria", state.get("score_criteria")),
+        ("supervisor_score_rationales", state.get("supervisor_score_rationales")),
+        ("selected_comparison_rows", state.get("selected_comparison_rows")),
+        ("supervisor_swot", state.get("supervisor_swot")),
+        ("executive_summary", state.get("executive_summary")),
+        ("implications", state.get("implications")),
+        ("limitations", state.get("limitations")),
         ("metric_comparison_rows", state.get("metric_comparison_rows")),
-        ("charts", _resolve_charts(state)),
+        ("charts", state.get("chart_selection") or _resolve_charts(state)),
         ("final_judgment", state.get("final_judgment")),
         ("citation_refs", state.get("citation_refs")),
     )
@@ -178,27 +176,29 @@ def validate_final_delivery_state(state: AgentState) -> ValidationResult:
                 f"{section_name} is required for final delivery.",
             )
 
-    if state.get("scorecard") and not state.get("score_criteria"):
+    if state.get("supervisor_score_rationales") and not state.get("score_criteria"):
         result.add_hard_error(
             "no-fallback-ref-backfill",
-            "scorecard exists without score_criteria; do not backfill evidence from citation_refs.",
+            "supervisor score rationales exist without score_criteria; do not backfill evidence from citation_refs.",
         )
-    if state.get("comparison_matrix") and not state.get("metric_comparison_rows"):
+    if state.get("selected_comparison_rows") and not state.get("metric_comparison_rows"):
         result.add_hard_error(
             "no-fallback-ref-backfill",
-            "comparison_matrix exists without metric_comparison_rows; do not backfill evidence from citation_refs.",
+            "selected comparison rows exist without metric_comparison_rows; do not backfill evidence from citation_refs.",
         )
-    missing_chart_ids = missing_required_chart_ids(_resolve_charts(state))
-    if missing_chart_ids:
-        joined = ", ".join(missing_chart_ids)
+    resolved_charts = _resolve_charts(state)
+    if not resolved_charts:
         result.add_hard_error(
             "required-chart-missing",
-            f"charts must include required chart_ids: {joined}",
+            "at least one interpretable chart is required for final delivery.",
         )
 
     _add_summary_duplicate_warning(state, result)
     _add_generality_warning(state, result)
     _add_basis_mismatch_warning(state, result)
+    _add_score_rationale_repeat_warning(state, result)
+    _add_raw_metric_swot_warning(state, result)
+    _add_trend_title_warning(resolved_charts, result)
     result.soft_warnings = list(dict.fromkeys(result.soft_warnings))
 
     return result
@@ -300,6 +300,8 @@ def _add_basis_mismatch_warning(state: AgentState, result: ValidationResult) -> 
 
 
 def _resolve_charts(state: AgentState) -> list:
+    if "chart_selection" in state:
+        return state.get("chart_selection", [])
     if state.get("charts"):
         return state.get("charts", [])
     report_spec = state.get("report_spec")
@@ -310,3 +312,47 @@ def _resolve_charts(state: AgentState) -> list:
 
 def _normalize_text(value: str | None) -> str:
     return " ".join((value or "").split()).strip().lower()
+
+
+def _add_score_rationale_repeat_warning(state: AgentState, result: ValidationResult) -> None:
+    rationales = [
+        _normalize_text(item.rationale)
+        for item in state.get("supervisor_score_rationales", []) or []
+        if getattr(item, "rationale", None)
+    ]
+    repeated = {text for text in rationales if rationales.count(text) > 1 and text}
+    if repeated:
+        result.add_soft_warning(
+            "Supervisor score rationales contain repeated template text and may be too generic."
+        )
+
+
+def _add_raw_metric_swot_warning(state: AgentState, result: ValidationResult) -> None:
+    entries = state.get("supervisor_swot", []) or state.get("swot_matrix", [])
+    metric_markers = ("revenue", "margin", "roe", "cash", "gwh", "bn", "%")
+    for entry in entries:
+        for text in [
+            *(entry.strengths or []),
+            *(entry.weaknesses or []),
+            *(entry.opportunities or []),
+            *(entry.threats or []),
+        ]:
+            normalized = _normalize_text(text)
+            if (
+                normalized
+                and any(marker in normalized for marker in metric_markers)
+                and not any(keyword in normalized for keyword in ("의미", "강점", "기회", "부담", "방어력", "전략"))
+            ):
+                result.add_soft_warning(
+                    "SWOT entry may still read like a raw metric instead of a strategic interpretation."
+                )
+                return
+
+
+def _add_trend_title_warning(charts: list, result: ValidationResult) -> None:
+    for chart in charts or []:
+        if "trend" in chart.title.lower() and len(chart.x_axis_periods) <= 1:
+            result.add_soft_warning(
+                f"Chart '{chart.title}' uses 'Trend' even though it has a single period."
+            )
+            return

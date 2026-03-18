@@ -52,7 +52,7 @@ def review_agent(state: AgentState) -> AgentState:
         if result.passed
         else ReviewResult(
             passed=False,
-            revision_target=result.revision_target or "comparison",
+            revision_target=result.revision_target or "supervisor_synthesis",
             review_issues=result.review_issues or ["근거 또는 비교 논리가 충분하지 않음"],
         )
     )

@@ -1,19 +1,18 @@
 from prompts import build_comparison_prompt
 from pydantic import ValidationError
 
-from state import AgentState, StructuredComparisonOutput
-from tools.charting import build_chart_specs, missing_required_chart_ids
+from state import AgentState, ComparisonEvidenceOutput
 from tools.comparison_contract import (
     build_comparison_input_spec,
     build_legacy_comparison_artifacts,
-    validate_structured_comparison_output,
 )
+from tools.comparison_fallback import build_fallback_comparison_evidence
 from tools.openai_client import StructuredOutputError, invoke_structured_output
 from tools.validation import validate_comparison_outputs
 
 
 def comparison_agent(state: AgentState) -> AgentState:
-    """Generate second-pass comparison outputs from the first-pass claim catalog."""
+    """Generate comparison evidence packets for later supervisor-owned synthesis."""
     config = state["config"]
 
     try:
@@ -33,66 +32,64 @@ def comparison_agent(state: AgentState) -> AgentState:
         extracted_output = invoke_structured_output(
             config=config,
             prompt=prompt,
-            response_model=StructuredComparisonOutput,
+            response_model=ComparisonEvidenceOutput,
             max_output_tokens=max(config.openai_max_output_tokens, 4000),
         )
-        output = StructuredComparisonOutput.model_validate(extracted_output)
+        output = ComparisonEvidenceOutput.model_validate(extracted_output)
     except (StructuredOutputError, ValidationError) as exc:
-        return {
-            "status": "failed",
-            "last_error": str(exc),
-        }
+        output = build_fallback_comparison_evidence(
+            state=state,
+            comparison_input_spec=comparison_input_spec,
+        )
 
-    validation_error = validate_structured_comparison_output(output, comparison_input_spec)
-    if validation_error is not None:
-        return {
-            "status": "failed",
-            "last_error": validation_error,
-        }
-
-    legacy_artifacts = build_legacy_comparison_artifacts(output)
-    charts = build_chart_specs(
-        lges_metrics=state.get("lges_normalized_metrics", []),
-        catl_metrics=state.get("catl_normalized_metrics", []),
-        metric_comparison_rows=output.metric_comparison_rows,
+    metric_comparison_rows = _merge_required_metric_rows(
+        output.metric_comparison_rows,
+        state.get("profitability_reported_rows", []),
     )
-    missing_chart_ids = missing_required_chart_ids(charts)
-    if missing_chart_ids:
-        joined = ", ".join(missing_chart_ids)
-        return {
-            "status": "failed",
-            "last_error": f"Generated charts are missing required chart_ids: {joined}",
-        }
 
     comparison_state = {
         **state,
         "comparison_input_spec": comparison_input_spec,
-        "final_judgment": output.final_judgment,
-        "metric_comparison_rows": output.metric_comparison_rows,
-        "charts": charts,
-        "comparison_matrix": legacy_artifacts["comparison_matrix"],
-        "swot_matrix": legacy_artifacts["swot_matrix"],
-        "scorecard": legacy_artifacts["scorecard"],
+        "metric_comparison_rows": metric_comparison_rows,
     }
     validation = validate_comparison_outputs(comparison_state, output)
     if validation.hard_errors:
-        return {
-            "status": "failed",
-            "last_error": validation.hard_errors[0],
+        output = build_fallback_comparison_evidence(
+            state=state,
+            comparison_input_spec=comparison_input_spec,
+        )
+        metric_comparison_rows = _merge_required_metric_rows(
+            output.metric_comparison_rows,
+            state.get("profitability_reported_rows", []),
+        )
+        comparison_state = {
+            **state,
+            "comparison_input_spec": comparison_input_spec,
+            "metric_comparison_rows": metric_comparison_rows,
         }
+        validation = validate_comparison_outputs(comparison_state, output)
+        if validation.hard_errors:
+            return {
+                "status": "failed",
+                "last_error": validation.hard_errors[0],
+            }
+    legacy_artifacts = build_legacy_comparison_artifacts(output)
 
     return {
         "comparison_input_spec": comparison_input_spec,
         "synthesis_claims": output.synthesis_claims,
         "score_criteria": output.score_criteria,
-        "final_judgment": output.final_judgment,
-        "metric_comparison_rows": output.metric_comparison_rows,
-        "charts": charts,
+        "metric_comparison_rows": metric_comparison_rows,
         "comparison_matrix": legacy_artifacts["comparison_matrix"],
-        "swot_matrix": legacy_artifacts["swot_matrix"],
-        "scorecard": legacy_artifacts["scorecard"],
         "low_confidence_claims": output.low_confidence_claims,
         "schema_retry_count": 0,
         "status": "running",
         "last_error": None,
     }
+
+
+def _merge_required_metric_rows(generated_rows, required_rows):
+    merged = {row.row_id: row for row in generated_rows}
+    for row in required_rows or []:
+        merged.setdefault(row.row_id, row)
+    return list(merged.values())

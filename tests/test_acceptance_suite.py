@@ -20,13 +20,13 @@ def test_minimal_report_spec_fixture_matches_submission_shape(sample_state):
     markdown = assemble_markdown_report(state)
     html = assemble_html_report(state)
 
-    assert "## Summary" in markdown
-    assert "## 정량 비교표" in markdown
-    assert "## 차트" in markdown
+    assert "## Executive Summary" in markdown
+    assert "## 직접 비교표" in markdown
+    assert "## 차트와 해석" in markdown
     assert "## 종합 판단" in markdown
     assert "CATL은 포트폴리오 선택지가 더 넓고" in markdown
-    assert "Revenue Trend" in html
-    assert "Reported Profitability" in html
+    assert "Quick Comparison" in markdown
+    assert "Revenue Comparison" in html
     assert "Sample Market Report" in html
 
 
@@ -44,6 +44,13 @@ def test_full_workflow_e2e_runs_through_graph_and_exports_reports(
         retrieval_handles={"faiss_index_path": str(test_config.faiss_index_path)},
         preprocessing_summary=preprocessing_summary,
     )
+
+    def fake_blueprint_agent(current_state):
+        return {
+            "report_blueprint": synthetic_outputs["report_blueprint"],
+            "status": "running",
+            "last_error": None,
+        }
 
     def fake_market_agent(current_state):
         return {
@@ -75,13 +82,26 @@ def test_full_workflow_e2e_runs_through_graph_and_exports_reports(
             "comparison_input_spec": synthetic_outputs.get("comparison_input_spec"),
             "synthesis_claims": synthetic_outputs["synthesis_claims"],
             "score_criteria": synthetic_outputs["score_criteria"],
-            "final_judgment": synthetic_outputs["final_judgment"],
             "metric_comparison_rows": synthetic_outputs["metric_comparison_rows"],
-            "charts": synthetic_outputs["charts"],
             "comparison_matrix": synthetic_outputs["comparison_matrix"],
-            "swot_matrix": synthetic_outputs["swot_matrix"],
-            "scorecard": synthetic_outputs["scorecard"],
             "low_confidence_claims": synthetic_outputs["low_confidence_claims"],
+            "status": "running",
+            "last_error": None,
+        }
+
+    def fake_supervisor_synthesis_agent(current_state):
+        return {
+            "selected_comparison_rows": synthetic_outputs["selected_comparison_rows"],
+            "reference_only_rows": synthetic_outputs["reference_only_rows"],
+            "chart_selection": synthetic_outputs["chart_selection"],
+            "executive_summary": synthetic_outputs["executive_summary"],
+            "company_strategy_summaries": synthetic_outputs["company_strategy_summaries"],
+            "quick_comparison_panel": synthetic_outputs["quick_comparison_panel"],
+            "supervisor_swot": synthetic_outputs["supervisor_swot"],
+            "supervisor_score_rationales": synthetic_outputs["supervisor_score_rationales"],
+            "final_judgment": synthetic_outputs["final_judgment"],
+            "implications": synthetic_outputs["implications"],
+            "limitations": synthetic_outputs["limitations"],
             "status": "running",
             "last_error": None,
         }
@@ -95,10 +115,12 @@ def test_full_workflow_e2e_runs_through_graph_and_exports_reports(
             "last_error": None,
         }
 
+    monkeypatch.setitem(graph.AGENT_REGISTRY, "supervisor_blueprint", fake_blueprint_agent)
     monkeypatch.setitem(graph.AGENT_REGISTRY, "market_research", fake_market_agent)
     monkeypatch.setitem(graph.AGENT_REGISTRY, "lges_analysis", fake_lges_agent)
     monkeypatch.setitem(graph.AGENT_REGISTRY, "catl_analysis", fake_catl_agent)
     monkeypatch.setitem(graph.AGENT_REGISTRY, "comparison", fake_comparison_agent)
+    monkeypatch.setitem(graph.AGENT_REGISTRY, "supervisor_synthesis", fake_supervisor_synthesis_agent)
     monkeypatch.setitem(graph.AGENT_REGISTRY, "review", fake_review_agent)
     monkeypatch.setattr(
         app,
@@ -113,8 +135,8 @@ def test_full_workflow_e2e_runs_through_graph_and_exports_reports(
 
     assert state["status"] == "completed"
     assert state["review_result"].passed is True
-    assert state["comparison_matrix"]
-    assert state["charts"]
+    assert state["selected_comparison_rows"]
+    assert state["chart_selection"]
 
     exported_state = app._export_reports(state)
 

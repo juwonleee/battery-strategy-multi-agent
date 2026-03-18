@@ -11,7 +11,14 @@ def market_research_agent(state: AgentState) -> AgentState:
     """Generate evidence-backed market context using retrieval and structured output."""
     config = state["config"]
     retriever = _load_retriever(config)
-    research_questions = state.get("research_questions") or [
+    blueprint = state.get("report_blueprint")
+    blueprint_questions = []
+    if blueprint is not None:
+        for spec in blueprint.worker_task_specs:
+            if spec.worker_id == "market_research":
+                blueprint_questions = list(spec.question_set)
+                break
+    research_questions = blueprint_questions or state.get("research_questions") or [
         "What EV market changes are most important for comparing LGES and CATL diversification?",
         "What battery industry shifts matter for EV, ESS, and adjacent portfolio choices?",
         "What external risks shape diversification decisions in 2025?",

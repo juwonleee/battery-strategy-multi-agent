@@ -36,8 +36,11 @@ def assemble_markdown_report(state: AgentState) -> str:
     sections = [
         f"# {report_spec.title}",
         "",
-        "## Summary",
-        *_render_summary_markdown(state, report_spec, manifest_map, claim_map),
+        "## Executive Summary",
+        *_render_supervisor_summary_markdown(report_spec, manifest_map, claim_map),
+        "",
+        "## 비교 프레임과 방법",
+        *_render_bullets(report_spec.comparison_framework),
         "",
         "## 시장 배경",
         *_render_claim_section_markdown(
@@ -46,29 +49,28 @@ def assemble_markdown_report(state: AgentState) -> str:
             fallback=[state.get("market_context_summary", "정보 부족")],
         ),
         "",
-        "## LGES",
-        *_render_company_section_markdown(
-            company_name="LG Energy Solution",
-            atomic_claims=_claims_for_scope(report_spec.atomic_claims, "lges"),
-            metric_claims=_metric_claims_for_scope(report_spec.metric_claims, "lges"),
-            manifest_map=manifest_map,
-        ),
+        "## LGES 전략 요약",
+        *_render_bullets(report_spec.lges_strategy_summary),
         "",
-        "## CATL",
-        *_render_company_section_markdown(
-            company_name="CATL",
-            atomic_claims=_claims_for_scope(report_spec.atomic_claims, "catl"),
-            metric_claims=_metric_claims_for_scope(report_spec.metric_claims, "catl"),
-            manifest_map=manifest_map,
-        ),
+        "## CATL 전략 요약",
+        *_render_bullets(report_spec.catl_strategy_summary),
         "",
-        "## 정량 비교표",
+        "## Quick Comparison",
+        *_render_comparison_table(report_spec.quick_comparison_panel),
+        "",
+        "## 직접 비교표",
         *_render_metric_comparison_table_markdown(
-            report_spec.metric_comparison_rows,
+            report_spec.selected_comparison_rows,
             manifest_map,
         ),
         "",
-        "## 차트",
+        "## 참고 지표표",
+        *_render_metric_comparison_table_markdown(
+            report_spec.reference_only_rows,
+            manifest_map,
+        ),
+        "",
+        "## 차트와 해석",
         *_render_chart_specs_markdown(report_spec.charts),
         "",
         "## SWOT",
@@ -79,6 +81,12 @@ def assemble_markdown_report(state: AgentState) -> str:
         "",
         "## 종합 판단",
         _render_final_judgment_markdown(report_spec, manifest_map, claim_map),
+        "",
+        "## 시사점",
+        *_render_bullets(report_spec.implications),
+        "",
+        "## 한계와 주의사항",
+        *_render_bullets(report_spec.limitations),
         "",
         "## Reference",
         *_render_reference_lines(report_spec, manifest_map, claim_map),
@@ -91,7 +99,7 @@ def assemble_html_report(state: AgentState) -> str:
     manifest_map = {item.document_id: item for item in report_spec.references}
     claim_map = _build_claim_map(report_spec)
 
-    summary_items = _render_summary_markdown(state, report_spec, manifest_map, claim_map)
+    summary_items = _render_supervisor_summary_markdown(report_spec, manifest_map, claim_map)
     sections = [
         f"""
         <header class="hero">
@@ -104,6 +112,10 @@ def assemble_html_report(state: AgentState) -> str:
         """,
         f'<section class="summary-grid">{"".join(_render_summary_card_html(item) for item in summary_items)}</section>',
         _wrap_section(
+            "비교 프레임과 방법",
+            _markdown_bullets_to_html(_render_bullets(report_spec.comparison_framework)),
+        ),
+        _wrap_section(
             "시장 배경",
             _render_claim_section_html(
                 _claims_for_scope(report_spec.atomic_claims, "market"),
@@ -112,32 +124,33 @@ def assemble_html_report(state: AgentState) -> str:
             ),
         ),
         _wrap_section(
-            "LGES",
-            _render_company_section_html(
-                "LG Energy Solution",
-                _claims_for_scope(report_spec.atomic_claims, "lges"),
-                _metric_claims_for_scope(report_spec.metric_claims, "lges"),
-                manifest_map,
-            ),
+            "LGES 전략 요약",
+            _markdown_bullets_to_html(_render_bullets(report_spec.lges_strategy_summary)),
         ),
         _wrap_section(
-            "CATL",
-            _render_company_section_html(
-                "CATL",
-                _claims_for_scope(report_spec.atomic_claims, "catl"),
-                _metric_claims_for_scope(report_spec.metric_claims, "catl"),
-                manifest_map,
-            ),
+            "CATL 전략 요약",
+            _markdown_bullets_to_html(_render_bullets(report_spec.catl_strategy_summary)),
         ),
         _wrap_section(
-            "정량 비교표",
+            "Quick Comparison",
+            _render_comparison_table_html(report_spec.quick_comparison_panel),
+        ),
+        _wrap_section(
+            "직접 비교표",
             _render_metric_comparison_table_html(
-                report_spec.metric_comparison_rows,
+                report_spec.selected_comparison_rows,
                 manifest_map,
             ),
         ),
         _wrap_section(
-            "차트",
+            "참고 지표표",
+            _render_metric_comparison_table_html(
+                report_spec.reference_only_rows,
+                manifest_map,
+            ),
+        ),
+        _wrap_section(
+            "차트와 해석",
             _render_chart_specs_html(report_spec.charts),
         ),
         _wrap_section(
@@ -151,6 +164,14 @@ def assemble_html_report(state: AgentState) -> str:
         _wrap_section(
             "종합 판단",
             f'<div class="panel"><p>{_html(_render_final_judgment_markdown(report_spec, manifest_map, claim_map))}</p></div>',
+        ),
+        _wrap_section(
+            "시사점",
+            _markdown_bullets_to_html(_render_bullets(report_spec.implications)),
+        ),
+        _wrap_section(
+            "한계와 주의사항",
+            _markdown_bullets_to_html(_render_bullets(report_spec.limitations)),
         ),
         _wrap_section(
             "Reference",
@@ -391,9 +412,21 @@ def assemble_html_report(state: AgentState) -> str:
 def _build_report_spec(state: AgentState) -> ReportSpec:
     existing_report_spec = state.get("report_spec")
     if existing_report_spec is not None:
-        if state.get("charts") and not existing_report_spec.charts:
-            return existing_report_spec.model_copy(update={"charts": state["charts"]})
-        return existing_report_spec
+        charts = existing_report_spec.charts
+        if state.get("chart_selection"):
+            charts = state["chart_selection"]
+        elif state.get("charts") and not existing_report_spec.charts:
+            charts = state["charts"]
+        normalized_charts = []
+        for chart in charts:
+            title = chart.title
+            chart_id = chart.chart_id
+            if "trend" in title.lower() and len(chart.x_axis_periods) <= 1:
+                title = title.replace("Trend", "Comparison")
+                if chart_id == "revenue_trend":
+                    chart_id = "revenue_comparison"
+            normalized_charts.append(chart.model_copy(update={"title": title, "chart_id": chart_id}))
+        return existing_report_spec.model_copy(update={"charts": normalized_charts})
 
     final_judgment = state.get("final_judgment")
     if final_judgment is None:
@@ -409,17 +442,28 @@ def _build_report_spec(state: AgentState) -> ReportSpec:
         metric_claims.extend(facts.metric_claims)
     if not atomic_claims and not metric_claims:
         atomic_claims, metric_claims = _derive_legacy_claims(state)
+    atomic_claims = _dedupe_claims_by_id(atomic_claims)
+    metric_claims = _dedupe_claims_by_id(metric_claims)
 
     return ReportSpec(
         title="배터리 전략 비교 보고서",
+        executive_summary=state.get("executive_summary", []),
+        comparison_framework=_build_comparison_framework(state),
+        lges_strategy_summary=(state.get("company_strategy_summaries", {}) or {}).get("lges", []),
+        catl_strategy_summary=(state.get("company_strategy_summaries", {}) or {}).get("catl", []),
+        quick_comparison_panel=state.get("quick_comparison_panel", []),
+        selected_comparison_rows=state.get("selected_comparison_rows", []),
+        reference_only_rows=state.get("reference_only_rows", []),
+        implications=state.get("implications", []),
+        limitations=state.get("limitations", []),
         atomic_claims=atomic_claims,
         metric_claims=metric_claims,
         synthesis_claims=state.get("synthesis_claims", []),
-        swot_matrix=state.get("swot_matrix", []),
-        score_criteria=state.get("score_criteria", []),
+        swot_matrix=state.get("supervisor_swot", []) or state.get("swot_matrix", []),
+        score_criteria=state.get("supervisor_score_rationales", []) or state.get("score_criteria", []),
         metric_comparison_rows=state.get("metric_comparison_rows", [])
         or state.get("profitability_reported_rows", []),
-        charts=state.get("charts", []),
+        charts=state.get("chart_selection", []) or state.get("charts", []),
         final_judgment=final_judgment,
         references=state.get("document_manifest", []),
     )
@@ -513,11 +557,39 @@ def _derive_legacy_claims(state: AgentState) -> tuple[list[AtomicFactClaim], lis
     return atomic_claims, metric_claims
 
 
+def _dedupe_claims_by_id(claims):
+    deduped = []
+    seen = set()
+    for claim in claims:
+        if claim.claim_id in seen:
+            continue
+        seen.add(claim.claim_id)
+        deduped.append(claim)
+    return deduped
+
+
 def _build_claim_map(report_spec: ReportSpec) -> dict[str, AtomicFactClaim | MetricFactClaim]:
     return {
         claim.claim_id: claim
         for claim in [*report_spec.atomic_claims, *report_spec.metric_claims]
     }
+
+
+def _build_comparison_framework(state: AgentState) -> list[str]:
+    blueprint = state.get("report_blueprint")
+    if blueprint is None:
+        return ["비교 프레임 정보 부족"]
+    labels = {
+        "portfolio_diversification": "포트폴리오 다각화",
+        "technology_product_strategy": "기술/제품 전략",
+        "regional_supply_chain": "지역/공급망",
+        "financial_resilience": "재무 방어력",
+    }
+    return [
+        f"비교 축: {', '.join(labels[item] for item in blueprint.comparison_axes)}",
+        "직접 비교 가능한 지표만 본표에 반영하고, 기준 불일치 지표는 참고 지표표로 분리한다.",
+        "워커는 evidence packet만 생성하며, 최종 문장과 종합 판단은 Supervisor가 직접 작성한다.",
+    ]
 
 
 def _render_summary_markdown(
@@ -540,6 +612,30 @@ def _render_summary_markdown(
         ),
     ][:5]
     return _render_bullets(summary_items)
+
+
+def _render_supervisor_summary_markdown(
+    report_spec: ReportSpec,
+    manifest_map: dict,
+    claim_map: dict,
+) -> list[str]:
+    if not report_spec.executive_summary:
+        return ["- 정보 부족"]
+    lines: list[str] = []
+    for index, item in enumerate(report_spec.executive_summary):
+        if index == 1 and report_spec.final_judgment is not None:
+            lines.append(
+                "- "
+                + _with_supporting_citations(
+                    item,
+                    report_spec.final_judgment.supporting_claim_ids,
+                    manifest_map,
+                    claim_map,
+                )
+            )
+        else:
+            lines.append(f"- {item}")
+    return lines
 
 
 def _render_company_section_markdown(
@@ -586,16 +682,17 @@ def _render_metric_claims_markdown(
 
 def _render_metric_comparison_table_markdown(rows: list, manifest_map: dict) -> list[str]:
     lines = [
-        "| 항목 | 기간 | LGES | CATL | 근거 |",
-        "|---|---|---|---|---|",
+        "| 항목 | 기간 | LGES | CATL | 구분 | 해석 | 근거 |",
+        "|---|---|---|---|---|---|---|",
     ]
     if not rows:
-        lines.append("| 정보 부족 | - | - | - | - |")
+        lines.append("| 정보 부족 | - | - | - | - | - | - |")
         return lines
     for row in rows:
         lines.append(
-            f"| {row.metric_name} | {row.period or '-'} | {row.lges_value or '-'} | "
-            f"{row.catl_value or '-'} | {_format_citation_text(row.evidence_refs, manifest_map) or '-'} |"
+            f"| {row.metric_name} | {row.period or '공시 없음'} | {row.lges_value or '공시 없음'} | "
+            f"{row.catl_value or '공시 없음'} | {row.comparability_status or '-'} | {row.interpretation or '-'} | "
+            f"{_format_citation_text(row.evidence_refs, manifest_map) or '-'} |"
         )
     return lines
 
@@ -611,8 +708,12 @@ def _render_chart_specs_markdown(charts: list[ChartSpec]) -> list[str]:
         lines.append(f"- X축: {periods}")
         lines.append(f"- Y축: {chart.y_axis_label}")
         for series in chart.series:
-            values = ", ".join("-" if value is None else str(value) for value in series.values) or "-"
+            values = ", ".join("공시 없음" if value is None else str(value) for value in series.values) or "-"
             lines.append(f"- {series.label}: {values}")
+        if chart.interpretation:
+            lines.append(f"- 해석: {chart.interpretation}")
+        if chart.caution_note:
+            lines.append(f"- 주의: {chart.caution_note}")
         lines.append("")
     return lines[:-1]
 
@@ -663,8 +764,12 @@ def _render_reference_lines(report_spec: ReportSpec, manifest_map: dict, claim_m
 
 
 def _render_summary_card_html(line: str) -> str:
-    label, _, value = line[2:].partition(": ")
-    return f'<article class="card"><strong>{_html(label)}</strong><p>{_html(value or label)}</p></article>'
+    content = line[2:]
+    label, _, value = content.partition(": ")
+    if not value:
+        label = "핵심 포인트"
+        value = content
+    return f'<article class="card"><strong>{_html(label)}</strong><p>{_html(value)}</p></article>'
 
 
 def _render_claim_section_html(claims, manifest_map, *, fallback=None) -> str:
@@ -685,14 +790,15 @@ def _render_metric_comparison_table_html(rows, manifest_map) -> str:
     if not rows:
         return '<p class="empty">정보 부족</p>'
     body = "".join(
-        f"<tr><td>{_html(row.metric_name)}</td><td>{_html(row.period or '-')}</td>"
-        f"<td>{_html(row.lges_value or '-')}</td><td>{_html(row.catl_value or '-')}</td>"
+        f"<tr><td>{_html(row.metric_name)}</td><td>{_html(row.period or '공시 없음')}</td>"
+        f"<td>{_html(row.lges_value or '공시 없음')}</td><td>{_html(row.catl_value or '공시 없음')}</td>"
+        f"<td>{_html(row.comparability_status or '-')}</td><td>{_html(row.interpretation or '-')}</td>"
         f"<td>{_html(_format_citation_text(row.evidence_refs, manifest_map) or '-')}</td></tr>"
         for row in rows
     )
     return (
         '<div class="comparison-panel"><table class="comparison-table"><thead><tr>'
-        "<th>항목</th><th>기간</th><th>LGES</th><th>CATL</th><th>근거</th></tr>"
+        "<th>항목</th><th>기간</th><th>LGES</th><th>CATL</th><th>구분</th><th>해석</th><th>근거</th></tr>"
         f"</thead><tbody>{body}</tbody></table></div>"
     )
 
@@ -719,6 +825,8 @@ def _render_chart_specs_html(charts: list[ChartSpec]) -> str:
             <article class="chart-card">
               <h3>{_html(chart.title)}</h3>
               <p class="chart-meta">Y축: {_html(chart.y_axis_label)}</p>
+              {f'<p class="chart-meta">{_html(chart.interpretation)}</p>' if chart.interpretation else ''}
+              {f'<p class="chart-meta">{_html(chart.caution_note)}</p>' if chart.caution_note else ''}
               <table class="chart-table">
                 <thead>
                   <tr>
@@ -818,6 +926,14 @@ def _collect_report_references(report_spec: ReportSpec, claim_map: dict) -> list
         refs.extend(claim.evidence_refs)
     for criterion in report_spec.score_criteria:
         refs.extend(criterion.evidence_refs)
+    for row in report_spec.selected_comparison_rows:
+        refs.extend(row.evidence_refs)
+    for row in report_spec.reference_only_rows:
+        refs.extend(row.evidence_refs)
+    for row in report_spec.quick_comparison_panel:
+        refs.extend(row.evidence_refs)
+    for entry in report_spec.swot_matrix:
+        refs.extend(entry.evidence_refs)
     for claim_id in report_spec.final_judgment.supporting_claim_ids:
         claim = claim_map.get(claim_id)
         if claim is not None:
@@ -1219,10 +1335,14 @@ def _collect_reference_items(state: AgentState) -> list[EvidenceRef]:
     refs.extend(state["catl_profile"].evidence_refs)
     for row in state.get("comparison_matrix", []):
         refs.extend(row.evidence_refs)
-    for entry in state.get("swot_matrix", []):
+    for row in state.get("selected_comparison_rows", []):
+        refs.extend(row.evidence_refs)
+    for row in state.get("reference_only_rows", []):
+        refs.extend(row.evidence_refs)
+    for entry in state.get("supervisor_swot", []) or state.get("swot_matrix", []):
         refs.extend(entry.evidence_refs)
-    for card in state.get("scorecard", []):
-        refs.extend(card.evidence_refs)
+    for item in state.get("supervisor_score_rationales", []) or state.get("scorecard", []):
+        refs.extend(item.evidence_refs)
 
     unique: dict[tuple[str, str | None, int | None], EvidenceRef] = {}
     for ref in refs:

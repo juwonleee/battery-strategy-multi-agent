@@ -21,13 +21,11 @@ def test_build_chart_specs_returns_required_fixed_chart_ids():
         metric_comparison_rows=_profitability_rows(),
     )
 
-    assert [chart.chart_id for chart in charts] == [
-        "revenue_trend",
-        "profitability_reported",
-    ]
+    assert [chart.chart_id for chart in charts] == ["revenue_comparison"]
     assert charts[0].series[0].label == "LGES Revenue"
     assert charts[0].series[0].values == [None]
     assert charts[0].series[1].values == [200.0]
+    assert charts[0].title == "Revenue Comparison"
 
 
 def test_build_chart_specs_maps_profitability_rows_to_expected_series_only():
@@ -50,17 +48,7 @@ def test_build_chart_specs_maps_profitability_rows_to_expected_series_only():
         ],
     )
 
-    profitability_chart = next(chart for chart in charts if chart.chart_id == "profitability_reported")
-
-    assert profitability_chart.series[0].label == "LGES Operating Margin"
-    assert profitability_chart.series[0].source_row_ids == ["profitability_lges"]
-    assert profitability_chart.series[1].label == "CATL Net Profit Margin"
-    assert profitability_chart.series[1].source_row_ids == ["profitability_catl"]
-    assert "profitability_extra" not in {
-        row_id
-        for series in profitability_chart.series
-        for row_id in series.source_row_ids
-    }
+    assert charts == []
 
 
 def _profitability_rows() -> list[MetricComparisonRow]:
