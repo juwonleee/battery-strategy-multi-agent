@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _load_dotenv(env_path: Path) -> None:
-    """Load a local .env file without overwriting existing environment values."""
+    """Load a local .env file and prefer its values over inherited shell state."""
     if not env_path.exists():
         return
 
@@ -18,7 +18,7 @@ def _load_dotenv(env_path: Path) -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip("'").strip('"')
-        if key and key not in os.environ:
+        if key:
             os.environ[key] = value
 
 
