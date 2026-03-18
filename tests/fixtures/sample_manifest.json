@@ -1,0 +1,20 @@
+[
+  {
+    "document_id": "market-001",
+    "title": "Sample Market Report",
+    "source_path": "data/raw/sample-market.pdf",
+    "source_type": "industry_report",
+    "company_scope": "market",
+    "published_at": "2025-01-01",
+    "page_range": "1-2"
+  },
+  {
+    "document_id": "lges-001",
+    "title": "Sample LGES Deck",
+    "source_path": "data/raw/sample-lges.pdf",
+    "source_type": "company_report",
+    "company_scope": "lges",
+    "published_at": "2025-02-01",
+    "page_range": "3-4"
+  }
+]
