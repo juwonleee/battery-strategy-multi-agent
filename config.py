@@ -95,6 +95,7 @@ class AppConfig:
     retrieval_metadata_path: Path
     retrieval_manifest_path: Path
     output_markdown_path: Path
+    output_html_path: Path
     output_pdf_path: Path
     log_path: Path
     preprocess_chunk_size: int
@@ -142,6 +143,7 @@ def load_config(
         / os.getenv("RETRIEVAL_MANIFEST_PATH", "data/index/retrieval_manifest.json"),
         output_markdown_path=base_dir
         / os.getenv("OUTPUT_MARKDOWN_PATH", "outputs/report.md"),
+        output_html_path=base_dir / os.getenv("OUTPUT_HTML_PATH", "outputs/report.html"),
         output_pdf_path=base_dir / os.getenv("OUTPUT_PDF_PATH", "outputs/report.pdf"),
         log_path=base_dir / os.getenv("LOG_PATH", "logs/app.log"),
         preprocess_chunk_size=_read_int_env("PREPROCESS_CHUNK_SIZE", 1200),

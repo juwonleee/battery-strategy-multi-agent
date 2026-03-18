@@ -15,6 +15,7 @@
    - `python3 -m venv .venv`
 2. 의존성 설치
    - `.venv/bin/pip install -r requirements.txt`
+   - `.venv/bin/python -m playwright install chromium`
 3. 환경변수 준비
    - `.env.example`을 복사해 `.env` 생성
    - `OPENAI_API_KEY` 입력
@@ -34,6 +35,8 @@
 ## Expected Outputs
 - Markdown 보고서
   - `outputs/report.md`
+- HTML 보고서
+  - `outputs/report.html`
 - PDF 보고서
   - `outputs/report.pdf`
 - 실행 로그
@@ -46,6 +49,8 @@
 ## Sample Outputs In This Workspace
 - 최신 샘플 Markdown
   - `outputs/report.md`
+- 최신 샘플 HTML
+  - `outputs/report.html`
 - 최신 샘플 PDF
   - `outputs/report.pdf`
 - 최신 실행 로그
@@ -56,6 +61,30 @@
   - `.venv/bin/python -m py_compile app.py graph.py state.py agents/*.py tools/*.py`
 - 테스트
   - `.venv/bin/pytest -q`
+
+## Acceptance Suite
+- schema tests
+  - `tests/test_schema_contracts.py`
+- normalization tests
+  - `tests/test_normalization.py`
+- validator and review gate tests
+  - `tests/test_validation.py`
+  - `tests/test_review_prompt.py`
+- report assembly and PDF smoke tests
+  - `tests/test_reporting.py`
+- chart spec tests
+  - `tests/test_charting.py`
+- workflow and export E2E
+  - `tests/test_app_e2e.py`
+  - `tests/test_acceptance_suite.py`
+
+## Manual Submission Checklist
+- 회색 면이나 장식용 배경이 본문 가독성을 해치지 않는지 확인
+- 표지 이후 본문 페이지에 큰 공백만 남는 페이지가 없는지 확인
+- 표가 페이지 경계에서 잘려도 읽을 수 있게 유지되는지 확인
+- `Revenue Trend`, `Reported Profitability` 두 차트가 모두 보이는지 확인
+- `종합 판단` 섹션이 결론 흐름을 마무리하고 `Reference`가 별도 부록처럼 끝나는지 확인
+- citation, score rationale, final judgment가 서로 같은 근거를 가리키는지 확인
 
 ## Troubleshooting
 ### `invalid_api_key` 또는 `401`
@@ -81,9 +110,10 @@
 - 필요하면 해당 문서의 페이지 범위 확대 또는 manifest 보완
 
 ### PDF export skipped
-- `reportlab` 설치 여부 확인
+- `playwright` 설치 여부 확인
 - `.venv/bin/pip install -r requirements.txt`
-- Markdown 산출물은 `outputs/report.md`에 남아 있어야 함
+- `.venv/bin/python -m playwright install chromium`
+- Markdown/HTML 산출물은 `outputs/report.md`, `outputs/report.html`에 남아 있어야 함
 
 ## Operational Notes
 - `.env`, `data/raw`, `data/processed`, `data/index`, `outputs`, `logs`는 로컬 실행 산출물 성격이 강하므로 Git에 올리지 않는 운영이 기본입니다.

@@ -9,16 +9,22 @@ if str(ROOT_DIR) not in sys.path:
 
 from config import AppConfig, RuntimePaths
 from state import (
+    ChartSeries,
+    ChartSpec,
     ComparisonRow,
     CompanyProfile,
     DocumentRef,
     EvidenceRef,
     FinancialIndicator,
+    FinalJudgment,
     MarketContext,
+    MetricComparisonRow,
     PreprocessingSummary,
     ReviewResult,
+    ScoreCriterion,
     Scorecard,
     SwotEntry,
+    SynthesisClaim,
     build_initial_state,
 )
 
@@ -40,6 +46,7 @@ def test_config(tmp_path: Path) -> AppConfig:
         retrieval_metadata_path=tmp_path / "data" / "index" / "faiss_metadata.jsonl",
         retrieval_manifest_path=tmp_path / "data" / "index" / "retrieval_manifest.json",
         output_markdown_path=tmp_path / "outputs" / "report.md",
+        output_html_path=tmp_path / "outputs" / "report.html",
         output_pdf_path=tmp_path / "outputs" / "report.pdf",
         log_path=tmp_path / "logs" / "app.log",
         preprocess_chunk_size=1200,
@@ -169,6 +176,97 @@ def sample_state(
                     evidence_refs=[comparison_ref],
                 )
             ],
+            "synthesis_claims": [
+                SynthesisClaim(
+                    scope="catl",
+                    category="portfolio_breadth",
+                    ordinal=1,
+                    claim_text="CATL may have broader optionality while LGES remains more focused.",
+                    supporting_claim_ids=["market-policy_signal-1", "catl-diversification_strategy-1"],
+                )
+            ],
+            "score_criteria": [
+                ScoreCriterion(
+                    criterion_key="diversification_strength",
+                    company_scope="lges",
+                    score=3,
+                    rationale="LGES is diversifying through ESS and regional localization.",
+                    supporting_claim_ids=["lges-diversification_strategy-1", "market-comparison_axis-1"],
+                    evidence_refs=[lges_ref],
+                ),
+                ScoreCriterion(
+                    criterion_key="diversification_strength",
+                    company_scope="catl",
+                    score=5,
+                    rationale="CATL combines scale, chemistry breadth, and ESS exposure.",
+                    supporting_claim_ids=["catl-diversification_strategy-1", "market-comparison_axis-1"],
+                    evidence_refs=[catl_ref],
+                ),
+            ],
+            "final_judgment": FinalJudgment(
+                judgment_text="CATL has broader diversification optionality, while LGES is more regionally focused.",
+                supporting_claim_ids=["market-policy_signal-1", "catl-diversification_strategy-1"],
+            ),
+            "metric_comparison_rows": [
+                MetricComparisonRow(
+                    row_id="profitability_lges",
+                    row_group="profitability_reported",
+                    metric_name="operating_margin",
+                    period="FY2025",
+                    lges_value="7.2%",
+                    catl_value=None,
+                    basis_note="Reported basis differs across companies and is preserved as disclosed.",
+                    evidence_refs=[lges_ref],
+                ),
+                MetricComparisonRow(
+                    row_id="profitability_catl",
+                    row_group="profitability_reported",
+                    metric_name="net_profit_margin",
+                    period="FY2024",
+                    lges_value=None,
+                    catl_value="11%",
+                    basis_note="Reported basis differs across companies and is preserved as disclosed.",
+                    evidence_refs=[catl_ref],
+                ),
+            ],
+            "charts": [
+                ChartSpec(
+                    chart_id="revenue_trend",
+                    title="Revenue Trend",
+                    series=[
+                        ChartSeries(
+                            label="LGES Revenue",
+                            values=[None],
+                            source_row_ids=["lges-revenue-growth-guidance-1"],
+                        ),
+                        ChartSeries(
+                            label="CATL Revenue",
+                            values=[400.0],
+                            source_row_ids=["catl-revenue-1"],
+                        ),
+                    ],
+                    x_axis_periods=["FY2025"],
+                    y_axis_label="Revenue (reported units)",
+                ),
+                ChartSpec(
+                    chart_id="profitability_reported",
+                    title="Reported Profitability",
+                    series=[
+                        ChartSeries(
+                            label="LGES Operating Margin",
+                            values=[7.2, None],
+                            source_row_ids=["profitability_lges"],
+                        ),
+                        ChartSeries(
+                            label="CATL Net Profit Margin",
+                            values=[None, 11.0],
+                            source_row_ids=["profitability_catl"],
+                        ),
+                    ],
+                    x_axis_periods=["FY2025", "FY2024"],
+                    y_axis_label="Margin (%)",
+                ),
+            ],
             "swot_matrix": [
                 SwotEntry(
                     company_name="LG Energy Solution",
@@ -211,6 +309,7 @@ def sample_state(
             "low_confidence_claims": [],
             "review_result": ReviewResult(passed=True, revision_target=None, review_issues=[]),
             "review_issues": [],
+            "validation_warnings": [],
             "current_step": "finish",
             "status": "completed",
             "routing_reason": "Synthetic completed state for testing.",

@@ -1,17 +1,37 @@
 from prompts import build_review_prompt
+from pydantic import ValidationError
 from state import AgentState, ReviewResult
 from tools.openai_client import StructuredOutputError, invoke_structured_output
+from tools.reporting import build_report_spec
+from tools.validation import validate_final_delivery_state
 
 
 def review_agent(state: AgentState) -> AgentState:
     """Review comparison outputs and request a targeted revision if needed."""
     config = state["config"]
+    try:
+        report_spec = build_report_spec(state)
+    except Exception as exc:
+        validation = validate_final_delivery_state(state)
+        if validation.hard_errors:
+            return {
+                "validation_warnings": validation.soft_warnings,
+                "status": "failed",
+                "last_error": validation.hard_errors[0],
+            }
+        return {
+            "status": "failed",
+            "last_error": str(exc),
+        }
+
     prompt = build_review_prompt(
         market_context_summary=state.get("market_context_summary", ""),
         comparison_matrix=state.get("comparison_matrix", []),
         swot_matrix=state.get("swot_matrix", []),
         scorecard=state.get("scorecard", []),
         low_confidence_claims=state.get("low_confidence_claims", []),
+        report_spec=report_spec,
+        validation_warnings=state.get("validation_warnings", []),
     )
 
     try:
@@ -20,31 +40,55 @@ def review_agent(state: AgentState) -> AgentState:
             prompt=prompt,
             response_model=ReviewResult,
         )
-    except StructuredOutputError as exc:
+        result = ReviewResult.model_validate(result)
+    except (StructuredOutputError, ValidationError) as exc:
         return {
             "status": "failed",
             "last_error": str(exc),
         }
 
-    if result.passed:
-        result = ReviewResult(passed=True, revision_target=None, review_issues=[])
+    normalized_result = (
+        ReviewResult(passed=True, revision_target=None, review_issues=[])
+        if result.passed
+        else ReviewResult(
+            passed=False,
+            revision_target=result.revision_target or "comparison",
+            review_issues=result.review_issues or ["근거 또는 비교 논리가 충분하지 않음"],
+        )
+    )
+    validated_state = {
+        **state,
+        "report_spec": report_spec,
+        "review_result": normalized_result,
+    }
+    final_validation = validate_final_delivery_state(validated_state)
+    if final_validation.hard_errors:
         return {
-            "review_result": result,
+            "report_spec": report_spec,
+            "review_result": normalized_result,
+            "review_issues": normalized_result.review_issues,
+            "validation_warnings": final_validation.soft_warnings,
+            "status": "failed",
+            "last_error": final_validation.hard_errors[0],
+        }
+
+    if normalized_result.passed:
+        return {
+            "report_spec": report_spec,
+            "review_result": normalized_result,
             "review_issues": [],
+            "validation_warnings": final_validation.soft_warnings,
             "schema_retry_count": 0,
             "status": "reviewed",
             "last_error": None,
         }
 
-    revision_target = result.revision_target or "comparison"
-    review_issues = result.review_issues or ["근거 또는 비교 논리가 충분하지 않음"]
+    review_issues = normalized_result.review_issues
     return {
-        "review_result": ReviewResult(
-            passed=False,
-            revision_target=revision_target,
-            review_issues=review_issues,
-        ),
+        "report_spec": report_spec,
+        "review_result": normalized_result,
         "review_issues": review_issues,
+        "validation_warnings": final_validation.soft_warnings,
         "schema_retry_count": 0,
         "status": "reviewed",
         "last_error": None,

@@ -6,11 +6,16 @@ from dataclasses import dataclass
 from state import (
     ClaimTrace,
     ComparisonRow,
+    ComparisonInputSpec,
     CompanyProfile,
     EvidenceRef,
+    FinalJudgment,
     MarketContext,
+    ReportSpec,
     ReviewResult,
     Scorecard,
+    ScoreCriterion,
+    SynthesisClaim,
     SwotEntry,
 )
 
@@ -56,9 +61,13 @@ def build_market_research_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "MarketContext 객체를 반환한다.",
-                "summary, key_findings, comparison_axes는 모두 한국어로 작성한다.",
-                "comparison_axes는 두 기업 모두에 재사용 가능한 짧은 한국어 라벨로 작성한다.",
+                "MarketFactExtractionOutput 객체를 반환한다.",
+                "자유형 시장 보고서가 아니라 1차 fact extraction만 수행한다.",
+                "summary는 선택 필드이며 한두 문장 한국어 요약으로만 작성한다.",
+                "atomic_claims의 category는 market_overview, demand_signal, policy_signal, risk_signal, comparison_axis 중 하나만 사용한다.",
+                "comparison_axis category claim은 두 기업 모두에 재사용 가능한 짧은 한국어 비교 축으로 작성한다.",
+                "각 atomic_claim과 metric_claim에는 evidence_refs를 최소 1개 포함한다.",
+                "source_evidence_refs에는 실제로 사용한 상위 근거 ref만 넣는다.",
             ]
         ),
         input_text=input_text,
@@ -68,15 +77,26 @@ def build_market_research_prompt(
 def build_company_analysis_prompt(
     *,
     company_name: str,
+    company_scope: str,
     goal: str,
     market_context_summary: str,
     evidence_refs: list[EvidenceRef],
+    required_metric_families: list[str],
+    raw_metric_page_hints: list[int] | None = None,
 ) -> PromptBundle:
+    raw_page_text = (
+        "없음"
+        if not raw_metric_page_hints
+        else ", ".join(str(page) for page in raw_metric_page_hints)
+    )
     input_text = "\n\n".join(
         [
             f"목표:\n{goal}",
             f"기업명:\n{company_name}",
+            f"기업 scope:\n{company_scope}",
             f"시장 요약:\n{market_context_summary or '정보 부족'}",
+            "필수 metric family:\n" + "\n".join(f"- {item}" for item in required_metric_families),
+            f"CATL raw page 힌트:\n{raw_page_text}",
             "근거:\n" + serialize_evidence_refs(evidence_refs),
         ]
     )
@@ -85,16 +105,32 @@ def build_company_analysis_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "CompanyProfile 객체를 반환한다.",
-                "business_overview, diversification_strategy, regional_strategy, technology_strategy, financial_indicators, risk_factors는 모두 한국어로 작성한다.",
-                "리스트 항목은 짧고 구체적이어야 하며 제공된 근거에만 기반해야 한다.",
+                f"{company_scope.upper()}FactExtractionOutput 객체를 반환한다.",
+                "자유형 company profile을 쓰지 말고 1차 fact extraction만 수행한다.",
+                "summary는 선택 필드이며 한두 문장 한국어 요약으로만 작성한다.",
                 (
-                    "financial_indicators 작성 규칙:\n"
-                    "- 매출, 영업이익, 영업이익률, EBITDA, 순이익, ROE, 부채비율 등 실제 재무 수치만 포함한다.\n"
-                    "- 매출 성장률 가이던스와 영업이익률 목표는 반드시 별도 항목으로 분리한다.\n"
-                    "- 예시: {metric: '2026E 매출 성장률', value: 'Mid-teen ~ +20% YoY'}, "
-                    "{metric: '2026E 영업이익률 목표', value: '+Mid-single%'}\n"
-                    "- 전략적 방향(다각화, 투자 계획 등)은 diversification_strategy에 작성하고 financial_indicators에 섞지 않는다."
+                    "atomic_claims category 규칙:\n"
+                    "- business_overview\n"
+                    "- core_product\n"
+                    "- diversification_strategy\n"
+                    "- regional_strategy\n"
+                    "- technology_strategy\n"
+                    "- risk_factor\n"
+                    "- 위 6개 외 category는 사용하지 않는다."
+                ),
+                (
+                    "metric_claims 작성 규칙:\n"
+                    f"- category는 다음 필수 family 식별자 중 하나를 사용해야 한다: {', '.join(required_metric_families)}\n"
+                    "- metric_name은 문서 표기 원문 이름을 최대한 유지한다.\n"
+                    "- value는 숫자 또는 짧은 원문 값을 사용한다.\n"
+                    "- reported_basis, period, unit은 문서에 있을 때만 채운다.\n"
+                    "- 각 metric_claim에는 evidence_refs를 최소 1개 포함한다."
+                ),
+                "source_evidence_refs에는 실제로 사용한 상위 근거 ref만 넣는다.",
+                (
+                    "CATL인 경우 raw financial extraction 규칙:\n"
+                    "- page 4, 8, 9, 11, 14를 우선 근거로 사용한다.\n"
+                    "- revenue, profit for the year, net profit margin, gross profit margin, ROE, operating cash flow raw 값을 반드시 보존한다."
                 ),
             ]
         ),
@@ -105,32 +141,26 @@ def build_company_analysis_prompt(
 def build_comparison_prompt(
     *,
     goal: str,
-    market_context: MarketContext,
-    lges_profile: CompanyProfile,
-    catl_profile: CompanyProfile,
-    comparison_evidence_refs: list[EvidenceRef],
+    comparison_input_spec: ComparisonInputSpec,
 ) -> PromptBundle:
     payload = {
         "goal": goal,
-        "market_context": market_context.model_dump(mode="json"),
-        "lges_profile": lges_profile.model_dump(mode="json"),
-        "catl_profile": catl_profile.model_dump(mode="json"),
-        "comparison_evidence": [
-            item.model_dump(mode="json") for item in comparison_evidence_refs
-        ],
+        "comparison_input_spec": comparison_input_spec.model_dump(mode="json"),
     }
     return PromptBundle(
         name="comparison",
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "ComparisonOutput 객체를 반환한다.",
-                "두 기업 프로필을 동일한 비교 축과 근거 기준으로 비교한다.",
-                "3~5개의 comparison row를 만들고 strategy_axis와 implication은 짧은 한국어로 작성한다.",
+                "StructuredComparisonOutput 객체를 반환한다.",
+                "입력으로 제공된 claim catalog만 사용해 2차 패스 비교를 수행한다.",
+                "raw evidence snippet이나 추가 검색 결과를 상정하지 말고, claim_id/claim_text/key_value/source_label/page_locator만 사용한다.",
+                "3~5개의 synthesis_claim을 만들고 각 claim에는 supporting_claim_ids를 반드시 채운다.",
+                "metric_comparison_rows는 claim catalog에서 직접 비교 가능한 수치/축만 사용한다.",
                 "SWOT entry는 정확히 2개여야 하며 LG Energy Solution 1개, CATL 1개를 만든다.",
-                "scorecard는 정확히 2개여야 하며 LG Energy Solution 1개, CATL 1개를 만든다.",
-                "SWOT 각 항목은 최대 3개 bullet 수준으로 제한하고, 각 row 또는 scorecard에는 1~3개의 evidence ref를 사용한다.",
-                "각 점수는 1~5 또는 null이어야 하며, score_rationale은 비어 있지 않은 한국어 문장이어야 한다.",
+                "score_criteria는 criterion_key를 diversification_strength, cost_competitiveness, market_adaptability, risk_exposure 중 하나로 사용한다.",
+                "ScoreCriterion의 company_scope는 lges 또는 catl만 사용하고, evidence_refs는 supporting_claim_ids에서 상속하지 말고 materialized field로 직접 채운다.",
+                "final_judgment에는 supporting_claim_ids를 반드시 채운다.",
                 "근거가 약하거나 불완전하면 추정하지 말고 low_confidence_claims에 ClaimTrace를 추가한다.",
             ]
         ),
@@ -145,6 +175,8 @@ def build_review_prompt(
     swot_matrix: list[SwotEntry],
     scorecard: list[Scorecard],
     low_confidence_claims: list[ClaimTrace],
+    report_spec: ReportSpec,
+    validation_warnings: list[str] | None = None,
 ) -> PromptBundle:
     payload = {
         "market_context_summary": market_context_summary,
@@ -154,6 +186,8 @@ def build_review_prompt(
         "low_confidence_claims": [
             item.model_dump(mode="json") for item in low_confidence_claims
         ],
+        "report_spec": report_spec.model_dump(mode="json"),
+        "validation_warnings": list(validation_warnings or []),
     }
     return PromptBundle(
         name="review",
@@ -162,7 +196,11 @@ def build_review_prompt(
                 COMMON_GUARDRAILS,
                 "ReviewResult 객체를 반환한다.",
                 "review_issues는 한국어로 작성한다.",
+                "comparison_matrix, swot_matrix, scorecard뿐 아니라 report_spec 전체를 함께 검토한다.",
+                "다음 항목을 우선순위로 점검한다: citation 누락, 점수 근거 부족, 결론-근거 불일치, summary exact duplicate, basis mismatch 설명 누락, 레이아웃상 필수 요소 누락.",
                 "근거 연결이 약하거나 비교 축이 불일치하거나 score rationale이 근거로 뒷받침되지 않으면 passed=false로 표시한다.",
+                "report_spec의 charts, metric_comparison_rows, score_criteria, final_judgment, references를 함께 대조해 누락/불일치 여부를 찾는다.",
+                "validation_warnings가 제공되면 이를 참고하되 그대로 복사하지 말고 실제 검토 결과로 재기술한다.",
                 "revision target이 필요하면 market_research, lges_analysis, catl_analysis, comparison 중 하나를 사용한다.",
             ]
         ),

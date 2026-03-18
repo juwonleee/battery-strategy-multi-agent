@@ -3,10 +3,22 @@ from state import AgentState, WorkflowStep
 
 REVIEW_INVALIDATIONS: dict[WorkflowStep, tuple[str, ...]] = {
     "market_research": (
+        "market_facts",
         "market_context",
         "market_context_summary",
+        "lges_facts",
+        "lges_normalized_metrics",
         "lges_profile",
+        "catl_facts",
+        "catl_normalized_metrics",
         "catl_profile",
+        "profitability_reported_rows",
+        "comparison_input_spec",
+        "synthesis_claims",
+        "score_criteria",
+        "final_judgment",
+        "metric_comparison_rows",
+        "charts",
         "comparison_matrix",
         "swot_matrix",
         "scorecard",
@@ -15,7 +27,16 @@ REVIEW_INVALIDATIONS: dict[WorkflowStep, tuple[str, ...]] = {
         "review_issues",
     ),
     "lges_analysis": (
+        "lges_facts",
+        "lges_normalized_metrics",
         "lges_profile",
+        "profitability_reported_rows",
+        "comparison_input_spec",
+        "synthesis_claims",
+        "score_criteria",
+        "final_judgment",
+        "metric_comparison_rows",
+        "charts",
         "comparison_matrix",
         "swot_matrix",
         "scorecard",
@@ -24,7 +45,16 @@ REVIEW_INVALIDATIONS: dict[WorkflowStep, tuple[str, ...]] = {
         "review_issues",
     ),
     "catl_analysis": (
+        "catl_facts",
+        "catl_normalized_metrics",
         "catl_profile",
+        "profitability_reported_rows",
+        "comparison_input_spec",
+        "synthesis_claims",
+        "score_criteria",
+        "final_judgment",
+        "metric_comparison_rows",
+        "charts",
         "comparison_matrix",
         "swot_matrix",
         "scorecard",
@@ -33,6 +63,12 @@ REVIEW_INVALIDATIONS: dict[WorkflowStep, tuple[str, ...]] = {
         "review_issues",
     ),
     "comparison": (
+        "comparison_input_spec",
+        "synthesis_claims",
+        "score_criteria",
+        "final_judgment",
+        "metric_comparison_rows",
+        "charts",
         "comparison_matrix",
         "swot_matrix",
         "scorecard",
@@ -50,16 +86,18 @@ REVIEW_INVALIDATIONS: dict[WorkflowStep, tuple[str, ...]] = {
 def supervisor_agent(state: AgentState) -> AgentState:
     """Route workflow execution, including retries, revisions, and terminal exits."""
     retry_budget = state["retry_budget"]
+    schema_retry_limit = min(retry_budget.schema_validation_max, 1)
+    review_retry_limit = min(retry_budget.review_max, 1)
     current_step = state.get("current_step")
 
     if state.get("status") == "failed":
         attempt = state.get("schema_retry_count", 0)
-        if current_step in REVIEW_INVALIDATIONS and attempt < retry_budget.schema_validation_max:
+        if current_step in REVIEW_INVALIDATIONS and attempt < schema_retry_limit:
             return {
                 "current_step": current_step,
                 "routing_reason": (
                     f"Retrying {current_step} after failure "
-                    f"({attempt + 1}/{retry_budget.schema_validation_max})."
+                    f"({attempt + 1}/{schema_retry_limit})."
                 ),
                 "schema_retry_count": attempt + 1,
                 "status": "routing",
@@ -76,7 +114,7 @@ def supervisor_agent(state: AgentState) -> AgentState:
     if review_result and not review_result.passed:
         attempt = state.get("review_retry_count", 0)
         revision_target = review_result.revision_target or "comparison"
-        if attempt >= retry_budget.review_max:
+        if attempt >= review_retry_limit:
             return {
                 "current_step": "finish",
                 "routing_reason": (
@@ -89,7 +127,7 @@ def supervisor_agent(state: AgentState) -> AgentState:
             "current_step": revision_target,
             "routing_reason": (
                 f"Review requested revision for {revision_target} "
-                f"({attempt + 1}/{retry_budget.review_max})."
+                f"({attempt + 1}/{review_retry_limit})."
             ),
             "review_retry_count": attempt + 1,
             "schema_retry_count": 0,
@@ -141,6 +179,7 @@ def _build_revision_reset(step: WorkflowStep) -> dict[str, object]:
             "comparison_matrix",
             "swot_matrix",
             "scorecard",
+            "charts",
             "low_confidence_claims",
             "review_issues",
         }:

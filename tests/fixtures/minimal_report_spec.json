@@ -1,0 +1,266 @@
+{
+  "title": "배터리 전략 비교 보고서",
+  "atomic_claims": [
+    {
+      "scope": "market",
+      "category": "policy_signal",
+      "ordinal": 1,
+      "claim_id": "market-policy_signal-1",
+      "claim_text": "지역 생산 정책이 배터리 공급망 의사결정에 직접 영향을 준다.",
+      "evidence_refs": [
+        {
+          "document_id": "market-001",
+          "chunk_id": "market-001-p001-c01",
+          "page": 1
+        }
+      ]
+    },
+    {
+      "scope": "lges",
+      "category": "diversification_strategy",
+      "ordinal": 1,
+      "claim_id": "lges-diversification_strategy-1",
+      "claim_text": "LGES는 ESS와 북미 현지화에 집중한다.",
+      "evidence_refs": [
+        {
+          "document_id": "lges-001",
+          "chunk_id": "lges-001-p003-c01",
+          "page": 3
+        }
+      ]
+    },
+    {
+      "scope": "catl",
+      "category": "diversification_strategy",
+      "ordinal": 1,
+      "claim_id": "catl-diversification_strategy-1",
+      "claim_text": "CATL은 ESS와 생태계 확장으로 선택지를 넓힌다.",
+      "evidence_refs": [
+        {
+          "document_id": "catl-001",
+          "chunk_id": "catl-001-p005-c01",
+          "page": 5
+        }
+      ]
+    }
+  ],
+  "metric_claims": [
+    {
+      "scope": "lges",
+      "category": "operating_margin_guidance_or_actual",
+      "ordinal": 1,
+      "claim_id": "lges-operating_margin_guidance_or_actual-1",
+      "claim_text": "LGES operating margin: 7.2%",
+      "metric_name": "Operating margin",
+      "value": "7.2%",
+      "period": "FY2025",
+      "evidence_refs": [
+        {
+          "document_id": "lges-001",
+          "chunk_id": "lges-001-p003-c01",
+          "page": 3
+        }
+      ]
+    },
+    {
+      "scope": "catl",
+      "category": "revenue",
+      "ordinal": 1,
+      "claim_id": "catl-revenue-1",
+      "claim_text": "CATL revenue: CNY 400bn",
+      "metric_name": "Revenue",
+      "value": "CNY 400bn",
+      "period": "FY2024",
+      "evidence_refs": [
+        {
+          "document_id": "catl-001",
+          "chunk_id": "catl-001-p005-c01",
+          "page": 5
+        }
+      ]
+    }
+  ],
+  "synthesis_claims": [
+    {
+      "scope": "catl",
+      "category": "portfolio_advantage",
+      "ordinal": 1,
+      "claim_id": "catl-portfolio_advantage-1",
+      "claim_text": "CATL은 LGES보다 인접 포트폴리오 선택지가 넓다.",
+      "supporting_claim_ids": [
+        "market-policy_signal-1",
+        "catl-diversification_strategy-1"
+      ],
+      "confidence_level": "high"
+    }
+  ],
+  "swot_matrix": [
+    {
+      "company_name": "LG Energy Solution",
+      "strengths": ["북미 현지화 기반"],
+      "weaknesses": ["EV 수요 민감도"],
+      "opportunities": ["ESS 확대"],
+      "threats": ["가격 경쟁"],
+      "evidence_refs": [
+        {
+          "document_id": "lges-001",
+          "chunk_id": "lges-001-p003-c01",
+          "page": 3
+        }
+      ]
+    },
+    {
+      "company_name": "CATL",
+      "strengths": ["규모와 포트폴리오 폭"],
+      "weaknesses": ["운영 복잡도"],
+      "opportunities": ["ESS/생태계 확장"],
+      "threats": ["정책 및 무역 리스크"],
+      "evidence_refs": [
+        {
+          "document_id": "catl-001",
+          "chunk_id": "catl-001-p005-c01",
+          "page": 5
+        }
+      ]
+    }
+  ],
+  "score_criteria": [
+    {
+      "criterion_key": "diversification_strength",
+      "company_scope": "lges",
+      "score": 3,
+      "rationale": "LGES는 집중된 확장 전략을 보인다.",
+      "supporting_claim_ids": [
+        "market-policy_signal-1",
+        "lges-diversification_strategy-1"
+      ],
+      "evidence_refs": [
+        {
+          "document_id": "lges-001",
+          "chunk_id": "lges-001-p003-c01",
+          "page": 3
+        }
+      ]
+    },
+    {
+      "criterion_key": "diversification_strength",
+      "company_scope": "catl",
+      "score": 5,
+      "rationale": "CATL은 더 넓은 선택지를 확보하고 있다.",
+      "supporting_claim_ids": [
+        "market-policy_signal-1",
+        "catl-diversification_strategy-1"
+      ],
+      "evidence_refs": [
+        {
+          "document_id": "catl-001",
+          "chunk_id": "catl-001-p005-c01",
+          "page": 5
+        }
+      ]
+    }
+  ],
+  "metric_comparison_rows": [
+    {
+      "row_id": "profitability_lges",
+      "row_group": "profitability_reported",
+      "metric_name": "operating_margin",
+      "period": "FY2025",
+      "lges_value": "7.2%",
+      "catl_value": null,
+      "basis_note": "Reported basis differs across companies and is preserved as disclosed.",
+      "evidence_refs": [
+        {
+          "document_id": "lges-001",
+          "chunk_id": "lges-001-p003-c01",
+          "page": 3
+        }
+      ]
+    },
+    {
+      "row_id": "profitability_catl",
+      "row_group": "profitability_reported",
+      "metric_name": "net_profit_margin",
+      "period": "FY2024",
+      "lges_value": null,
+      "catl_value": "11%",
+      "basis_note": "Reported basis differs across companies and is preserved as disclosed.",
+      "evidence_refs": [
+        {
+          "document_id": "catl-001",
+          "chunk_id": "catl-001-p005-c01",
+          "page": 5
+        }
+      ]
+    }
+  ],
+  "charts": [
+    {
+      "chart_id": "revenue_trend",
+      "title": "Revenue Trend",
+      "series": [
+        {
+          "label": "LGES Revenue",
+          "values": [null],
+          "source_row_ids": ["lges-operating_margin_guidance_or_actual-1"]
+        },
+        {
+          "label": "CATL Revenue",
+          "values": [400.0],
+          "source_row_ids": ["catl-revenue-1"]
+        }
+      ],
+      "x_axis_periods": ["FY2024"],
+      "y_axis_label": "Revenue (reported units)"
+    },
+    {
+      "chart_id": "profitability_reported",
+      "title": "Reported Profitability",
+      "series": [
+        {
+          "label": "LGES Operating Margin",
+          "values": [7.2, null],
+          "source_row_ids": ["profitability_lges"]
+        },
+        {
+          "label": "CATL Net Profit Margin",
+          "values": [null, 11.0],
+          "source_row_ids": ["profitability_catl"]
+        }
+      ],
+      "x_axis_periods": ["FY2025", "FY2024"],
+      "y_axis_label": "Margin (%)"
+    }
+  ],
+  "final_judgment": {
+    "judgment_text": "CATL은 포트폴리오 선택지가 더 넓고, LGES는 지역 집중도가 더 높다.",
+    "supporting_claim_ids": [
+      "market-policy_signal-1",
+      "catl-diversification_strategy-1"
+    ],
+    "confidence_level": "high"
+  },
+  "references": [
+    {
+      "document_id": "market-001",
+      "title": "Sample Market Report",
+      "source_path": "data/raw/sample-market.pdf",
+      "source_type": "industry_report",
+      "company_scope": "market"
+    },
+    {
+      "document_id": "lges-001",
+      "title": "Sample LGES Deck",
+      "source_path": "data/raw/sample-lges.pdf",
+      "source_type": "company_report",
+      "company_scope": "lges"
+    },
+    {
+      "document_id": "catl-001",
+      "title": "Sample CATL Prospectus",
+      "source_path": "data/raw/sample-catl.pdf",
+      "source_type": "regulatory_filing",
+      "company_scope": "catl"
+    }
+  ]
+}

@@ -1,20 +1,39 @@
 from pathlib import Path
 
 from config import load_config
-from graph import run_once, write_execution_log
 from state import AgentState, ReportArtifact, append_execution_log, build_initial_state
 from tools.preprocessing import prepare_document_corpus
 from tools.reporting import (
     ReportExportError,
+    assemble_html_report,
     assemble_markdown_report,
+    export_html_report,
     export_markdown_report,
     export_pdf_report,
     mark_report_artifact_status,
 )
-from tools.retrieval import prepare_retrieval_assets
+from tools.validation import validate_final_delivery_state
 
 
 MAX_WORKFLOW_ITERATIONS = 20
+
+
+def run_once(state: AgentState) -> AgentState:
+    from graph import run_once as _run_once
+
+    return _run_once(state)
+
+
+def write_execution_log(state: AgentState, log_path: Path) -> None:
+    from graph import write_execution_log as _write_execution_log
+
+    _write_execution_log(state, log_path)
+
+
+def prepare_retrieval_assets(config):
+    from tools.retrieval import prepare_retrieval_assets as _prepare_retrieval_assets
+
+    return _prepare_retrieval_assets(config)
 
 
 def main() -> None:
@@ -60,15 +79,37 @@ def main() -> None:
     print("FAISS index:", retrieval_handles["faiss_index_path"])
     print("Execution log:", config.log_path)
     print("Markdown report:", config.output_markdown_path)
+    print("HTML report:", config.output_html_path)
     print("PDF report:", config.output_pdf_path)
 
 
 def _export_reports(state: AgentState) -> AgentState:
     config = state["config"]
+    final_validation = validate_final_delivery_state(state)
+    if final_validation.hard_errors:
+        failed_state: AgentState = {
+            **state,
+            "status": "failed",
+            "last_error": final_validation.hard_errors[0],
+            "validation_warnings": final_validation.soft_warnings,
+        }
+        failed_state["execution_log"] = append_execution_log(
+            failed_state,
+            step="finish",
+            status="failed",
+            message=(
+                "Report export blocked by final validation: "
+                f"{final_validation.hard_errors[0]}"
+            ),
+        )
+        return failed_state
+
     markdown = assemble_markdown_report(state)
+    html = assemble_html_report(state)
 
     export_markdown_report(markdown, config.output_markdown_path)
-    exported_state = {
+    export_html_report(html, config.output_html_path)
+    exported_state: AgentState = {
         **state,
         "report_artifacts": _mark_artifact_created(
             state.get("report_artifacts", []),
@@ -77,15 +118,28 @@ def _export_reports(state: AgentState) -> AgentState:
             created=True,
         ),
     }
+    exported_state["report_artifacts"] = _mark_artifact_created(
+        exported_state.get("report_artifacts", []),
+        artifact_type="html",
+        path=config.output_html_path,
+        created=True,
+    )
     exported_state["execution_log"] = append_execution_log(
         exported_state,
         step="finish",
         status="completed",
         message=f"Markdown report exported to {config.output_markdown_path}.",
     )
+    exported_state["execution_log"] = append_execution_log(
+        exported_state,
+        step="finish",
+        status="completed",
+        message=f"HTML report exported to {config.output_html_path}.",
+    )
+    exported_state["validation_warnings"] = final_validation.soft_warnings
 
     try:
-        export_pdf_report(markdown, config.output_pdf_path)
+        export_pdf_report(html, config.output_pdf_path)
     except ReportExportError as exc:
         exported_state["report_artifacts"] = _mark_artifact_created(
             exported_state.get("report_artifacts", []),
