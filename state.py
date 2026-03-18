@@ -64,6 +64,28 @@ class EvidenceRef(BaseModel):
     snippet: str | None = None
 
 
+class ProcessedChunk(BaseModel):
+    chunk_id: str
+    document_id: str
+    title: str
+    source_path: str
+    source_type: SourceType
+    company_scope: CompanyScope
+    published_at: str | None = None
+    page: int
+    text: str
+    char_count: int = Field(ge=0)
+
+
+class PreprocessingSummary(BaseModel):
+    manifest_path: str
+    processed_manifest_path: str
+    processed_corpus_path: str
+    document_count: int = Field(ge=0)
+    chunk_count: int = Field(ge=0)
+    chunk_files: dict[str, str] = Field(default_factory=dict)
+
+
 class RetryBudget(BaseModel):
     schema_validation_max: int = Field(default=2, ge=0)
     review_max: int = Field(default=2, ge=0)
@@ -148,6 +170,7 @@ class AgentState(TypedDict, total=False):
     research_questions: list[str]
     source_documents: list[DocumentRef]
     document_manifest: list[DocumentRef]
+    preprocessing_summary: PreprocessingSummary
     retrieval_handles: dict[str, str]
     market_context: MarketContext
     market_context_summary: str
@@ -170,14 +193,14 @@ class AgentState(TypedDict, total=False):
     last_error: str | None
 
 
-def build_initial_state(config: AppConfig) -> AgentState:
-    manifest_ref = DocumentRef(
-        document_id="document-manifest",
-        title="Document manifest",
-        source_path=str(config.manifest_path),
-        source_type="other",
-        company_scope="shared",
-    )
+def build_initial_state(
+    config: AppConfig,
+    *,
+    source_documents: list[DocumentRef] | None = None,
+    retrieval_handles: dict[str, str] | None = None,
+    preprocessing_summary: PreprocessingSummary | None = None,
+) -> AgentState:
+    manifest_documents = list(source_documents or [])
     log_entry = ExecutionLogEntry(
         step="market_research",
         status="initialized",
@@ -188,9 +211,17 @@ def build_initial_state(config: AppConfig) -> AgentState:
         "target_companies": ["LG Energy Solution", "CATL"],
         "config": config,
         "research_questions": [],
-        "source_documents": [manifest_ref],
-        "document_manifest": [manifest_ref],
-        "retrieval_handles": {},
+        "source_documents": manifest_documents,
+        "document_manifest": manifest_documents,
+        "preprocessing_summary": preprocessing_summary
+        or PreprocessingSummary(
+            manifest_path=str(config.manifest_path),
+            processed_manifest_path=str(config.processed_manifest_path),
+            processed_corpus_path=str(config.processed_corpus_path),
+            document_count=len(manifest_documents),
+            chunk_count=0,
+        ),
+        "retrieval_handles": retrieval_handles or {},
         "citation_refs": [],
         "low_confidence_claims": [],
         "review_issues": [],

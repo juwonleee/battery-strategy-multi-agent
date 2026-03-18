@@ -87,16 +87,22 @@ class AppConfig:
     openai_model: str
     embedding_model: str
     manifest_path: Path
+    processed_manifest_path: Path
+    processed_corpus_path: Path
     faiss_index_path: Path
     output_markdown_path: Path
     output_pdf_path: Path
     log_path: Path
+    preprocess_chunk_size: int
+    preprocess_chunk_overlap: int
     max_schema_retries: int
     max_review_retries: int
     paths: RuntimePaths
 
 
-def load_config(root_dir: Path | None = None) -> AppConfig:
+def load_config(
+    root_dir: Path | None = None, *, require_openai_api_key: bool = True
+) -> AppConfig:
     base_dir = root_dir or Path(__file__).resolve().parent
     _load_dotenv(base_dir / ".env")
 
@@ -104,19 +110,31 @@ def load_config(root_dir: Path | None = None) -> AppConfig:
     paths.ensure_directories()
 
     return AppConfig(
-        openai_api_key=_read_required_env("OPENAI_API_KEY"),
+        openai_api_key=(
+            _read_required_env("OPENAI_API_KEY")
+            if require_openai_api_key
+            else os.getenv("OPENAI_API_KEY", "").strip()
+        ),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
         embedding_model=os.getenv(
             "EMBEDDING_MODEL", "intfloat/multilingual-e5-large"
         ),
         manifest_path=base_dir
         / os.getenv("DOCUMENT_MANIFEST_PATH", "data/document_manifest.json"),
+        processed_manifest_path=base_dir
+        / os.getenv(
+            "PROCESSED_MANIFEST_PATH", "data/processed/document_manifest.processed.json"
+        ),
+        processed_corpus_path=base_dir
+        / os.getenv("PROCESSED_CORPUS_PATH", "data/processed/corpus.jsonl"),
         faiss_index_path=base_dir
         / os.getenv("FAISS_INDEX_PATH", "data/index/faiss.index"),
         output_markdown_path=base_dir
         / os.getenv("OUTPUT_MARKDOWN_PATH", "outputs/report.md"),
         output_pdf_path=base_dir / os.getenv("OUTPUT_PDF_PATH", "outputs/report.pdf"),
         log_path=base_dir / os.getenv("LOG_PATH", "logs/app.log"),
+        preprocess_chunk_size=_read_int_env("PREPROCESS_CHUNK_SIZE", 1200),
+        preprocess_chunk_overlap=_read_int_env("PREPROCESS_CHUNK_OVERLAP", 200),
         max_schema_retries=_read_int_env("MAX_SCHEMA_RETRIES", 2),
         max_review_retries=_read_int_env("MAX_REVIEW_RETRIES", 2),
         paths=paths,
