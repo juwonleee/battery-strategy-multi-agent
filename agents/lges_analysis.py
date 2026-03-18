@@ -42,10 +42,11 @@ def _retrieve_lges_evidence(state: AgentState, retriever) -> list[EvidenceRef]:
         "LG Energy Solution diversification strategy ESS 46 series LFP mid-nickel capex regional strategy",
         "LGES financial outlook EV slowdown ESS growth customer exposure investment priorities",
         "LG Energy Solution technology roadmap and risk factors in 2025",
+        "LGES 2026 annual guidance revenue growth operating profit margin capex target financial outlook",
     ]
     evidence_map: dict[str, EvidenceRef] = {}
     for query in queries:
-        for hit in retriever.retrieve(query, scope="lges", top_k=4):
+        for hit in retriever.retrieve(query, scope="lges", top_k=6):
             if hit.chunk_id:
                 evidence_map[hit.chunk_id] = hit
     return list(evidence_map.values())
