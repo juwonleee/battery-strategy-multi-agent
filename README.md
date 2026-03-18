@@ -67,7 +67,13 @@ manifest는 JSON 배열이며, 각 항목은 아래 필드를 사용합니다.
 
 ## Preprocessing
 - `python3 -m tools.preprocessing`: manifest를 읽고 PDF를 청킹해 `data/processed`에 저장
+- `python3 -m tools.retrieval`: 청크 코퍼스를 임베딩하고 `data/index`에 FAISS 인덱스와 메타데이터 저장
 - `python3 app.py`: 전처리 후 전체 워크플로우 실행
+
+## Retrieval
+- 전역 FAISS 인덱스 1개를 만들고, 조회 시 `market`, `lges`, `catl`, `cross_check` scope로 필터링합니다.
+- 인덱스 산출물은 `data/index/faiss.index`, `data/index/faiss_metadata.jsonl`입니다.
+- 기본 임베딩 모델은 `intfloat/multilingual-e5-large`이며, 질의/문서 prefix를 자동 적용합니다.
 
 ## Directory Structure
 ```text

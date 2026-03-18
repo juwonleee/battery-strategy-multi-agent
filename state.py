@@ -43,6 +43,7 @@ SourceType = Literal[
 ]
 
 CompanyScope = Literal["market", "lges", "catl", "shared"]
+RetrievalScope = Literal["market", "lges", "catl", "cross_check"]
 
 
 class DocumentRef(BaseModel):
@@ -62,6 +63,7 @@ class EvidenceRef(BaseModel):
     page: int | None = None
     section_title: str | None = None
     snippet: str | None = None
+    score: float | None = None
 
 
 class ProcessedChunk(BaseModel):

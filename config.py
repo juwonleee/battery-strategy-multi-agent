@@ -90,11 +90,14 @@ class AppConfig:
     processed_manifest_path: Path
     processed_corpus_path: Path
     faiss_index_path: Path
+    retrieval_metadata_path: Path
+    retrieval_manifest_path: Path
     output_markdown_path: Path
     output_pdf_path: Path
     log_path: Path
     preprocess_chunk_size: int
     preprocess_chunk_overlap: int
+    retrieval_top_k: int
     max_schema_retries: int
     max_review_retries: int
     paths: RuntimePaths
@@ -129,12 +132,17 @@ def load_config(
         / os.getenv("PROCESSED_CORPUS_PATH", "data/processed/corpus.jsonl"),
         faiss_index_path=base_dir
         / os.getenv("FAISS_INDEX_PATH", "data/index/faiss.index"),
+        retrieval_metadata_path=base_dir
+        / os.getenv("RETRIEVAL_METADATA_PATH", "data/index/faiss_metadata.jsonl"),
+        retrieval_manifest_path=base_dir
+        / os.getenv("RETRIEVAL_MANIFEST_PATH", "data/index/retrieval_manifest.json"),
         output_markdown_path=base_dir
         / os.getenv("OUTPUT_MARKDOWN_PATH", "outputs/report.md"),
         output_pdf_path=base_dir / os.getenv("OUTPUT_PDF_PATH", "outputs/report.pdf"),
         log_path=base_dir / os.getenv("LOG_PATH", "logs/app.log"),
         preprocess_chunk_size=_read_int_env("PREPROCESS_CHUNK_SIZE", 1200),
         preprocess_chunk_overlap=_read_int_env("PREPROCESS_CHUNK_OVERLAP", 200),
+        retrieval_top_k=_read_int_env("RETRIEVAL_TOP_K", 6),
         max_schema_retries=_read_int_env("MAX_SCHEMA_RETRIES", 2),
         max_review_retries=_read_int_env("MAX_REVIEW_RETRIES", 2),
         paths=paths,

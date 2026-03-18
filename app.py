@@ -4,6 +4,7 @@ from config import load_config
 from graph import run_once
 from state import build_initial_state
 from tools.preprocessing import prepare_document_corpus
+from tools.retrieval import prepare_retrieval_assets
 
 
 def main() -> None:
@@ -11,6 +12,10 @@ def main() -> None:
     documents, retrieval_handles, preprocessing_summary = prepare_document_corpus(
         config
     )
+    retrieval_handles = {
+        **retrieval_handles,
+        **prepare_retrieval_assets(config),
+    }
 
     state = build_initial_state(
         config,
@@ -27,6 +32,7 @@ def main() -> None:
     print("Workflow finished:", state.get("status"))
     print("Output directory:", config.paths.outputs_dir)
     print("Processed corpus:", preprocessing_summary.processed_corpus_path)
+    print("FAISS index:", retrieval_handles["faiss_index_path"])
 
 
 if __name__ == "__main__":
