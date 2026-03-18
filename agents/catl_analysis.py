@@ -42,10 +42,12 @@ def _retrieve_catl_evidence(state: AgentState, retriever) -> list[EvidenceRef]:
         "CATL diversification strategy sodium-ion ESS ecosystem expansion global manufacturing competitive advantages",
         "CATL risk factors policy demand pricing competition supply chain and customer concentration",
         "CATL industry position market share technology roadmap and adjacent applications",
+        "CATL revenue net profit margin ROE financial performance 2024 annual results earnings",
+        "CATL cost structure gross margin battery materials recycling mineral resources business segment revenue breakdown",
     ]
     evidence_map: dict[str, EvidenceRef] = {}
     for query in queries:
-        for hit in retriever.retrieve(query, scope="catl", top_k=4):
+        for hit in retriever.retrieve(query, scope="catl", top_k=6):
             if hit.chunk_id:
                 evidence_map[hit.chunk_id] = hit
     return list(evidence_map.values())
