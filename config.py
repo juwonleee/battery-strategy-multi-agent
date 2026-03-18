@@ -85,6 +85,8 @@ class RuntimePaths:
 class AppConfig:
     openai_api_key: str
     openai_model: str
+    openai_timeout_seconds: int
+    openai_max_output_tokens: int
     embedding_model: str
     manifest_path: Path
     processed_manifest_path: Path
@@ -119,6 +121,8 @@ def load_config(
             else os.getenv("OPENAI_API_KEY", "").strip()
         ),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+        openai_timeout_seconds=_read_int_env("OPENAI_TIMEOUT_SECONDS", 60),
+        openai_max_output_tokens=_read_int_env("OPENAI_MAX_OUTPUT_TOKENS", 2000),
         embedding_model=os.getenv(
             "EMBEDDING_MODEL", "intfloat/multilingual-e5-large"
         ),

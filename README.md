@@ -75,6 +75,11 @@ manifest는 JSON 배열이며, 각 항목은 아래 필드를 사용합니다.
 - 인덱스 산출물은 `data/index/faiss.index`, `data/index/faiss_metadata.jsonl`입니다.
 - 기본 임베딩 모델은 `intfloat/multilingual-e5-large`이며, 질의/문서 prefix를 자동 적용합니다.
 
+## LLM Layer
+- OpenAI structured output 호출기는 [`tools/openai_client.py`](./tools/openai_client.py)에 있습니다.
+- 에이전트별 structured prompt 템플릿은 [`prompts/structured.py`](./prompts/structured.py)에 있습니다.
+- 프롬프트는 `정보 부족` 표기, 근거 참조 강제, 추정 금지 규칙을 공통 가드레일로 사용합니다.
+
 ## Directory Structure
 ```text
 .
