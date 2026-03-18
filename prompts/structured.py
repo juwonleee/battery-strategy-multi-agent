@@ -24,6 +24,7 @@ class PromptBundle:
 
 COMMON_GUARDRAILS = """
 You are generating structured analysis for a battery strategy comparison workflow.
+- 모든 설명, 요약, 리스트 항목, 비교 문장, score rationale, review issue는 한국어로 작성한다.
 - Use only the provided evidence snippets and context.
 - If the evidence is insufficient, state "정보 부족" instead of guessing.
 - Every substantive conclusion must map to the exact evidence references provided.
@@ -40,14 +41,14 @@ def build_market_research_prompt(
     evidence_refs: list[EvidenceRef],
 ) -> PromptBundle:
     questions = research_questions or [
-        "What market conditions matter most for comparing LGES and CATL diversification?",
-        "Which external pressures shape portfolio choices in EV and ESS?",
+        "LGES와 CATL의 다각화 전략 비교에서 가장 중요한 시장 조건은 무엇인가?",
+        "EV와 ESS 포트폴리오 선택에 영향을 주는 외부 압력은 무엇인가?",
     ]
     input_text = "\n\n".join(
         [
-            f"Goal:\n{goal}",
-            "Research questions:\n" + "\n".join(f"- {item}" for item in questions),
-            "Evidence:\n" + serialize_evidence_refs(evidence_refs),
+            f"목표:\n{goal}",
+            "연구 질문:\n" + "\n".join(f"- {item}" for item in questions),
+            "근거:\n" + serialize_evidence_refs(evidence_refs),
         ]
     )
     return PromptBundle(
@@ -55,8 +56,9 @@ def build_market_research_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "Return a MarketContext object with a concise summary, key findings, comparison axes, and evidence refs.",
-                "Comparison axes should be reusable for both companies and phrased as short labels.",
+                "MarketContext 객체를 반환한다.",
+                "summary, key_findings, comparison_axes는 모두 한국어로 작성한다.",
+                "comparison_axes는 두 기업 모두에 재사용 가능한 짧은 한국어 라벨로 작성한다.",
             ]
         ),
         input_text=input_text,
@@ -72,10 +74,10 @@ def build_company_analysis_prompt(
 ) -> PromptBundle:
     input_text = "\n\n".join(
         [
-            f"Goal:\n{goal}",
-            f"Company:\n{company_name}",
-            f"Market context summary:\n{market_context_summary or '정보 부족'}",
-            "Evidence:\n" + serialize_evidence_refs(evidence_refs),
+            f"목표:\n{goal}",
+            f"기업명:\n{company_name}",
+            f"시장 요약:\n{market_context_summary or '정보 부족'}",
+            "근거:\n" + serialize_evidence_refs(evidence_refs),
         ]
     )
     return PromptBundle(
@@ -83,9 +85,9 @@ def build_company_analysis_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "Return a CompanyProfile object.",
-                "Focus on business overview, diversification strategy, regional strategy, technology strategy, financial indicators, and risk factors.",
-                "Lists should be short, concrete, and grounded in the evidence snippets.",
+                "CompanyProfile 객체를 반환한다.",
+                "business_overview, diversification_strategy, regional_strategy, technology_strategy, financial_indicators, risk_factors는 모두 한국어로 작성한다.",
+                "리스트 항목은 짧고 구체적이어야 하며 제공된 근거에만 기반해야 한다.",
             ]
         ),
         input_text=input_text,
@@ -114,14 +116,14 @@ def build_comparison_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "Return a ComparisonOutput object.",
-                "Compare the two company profiles using the same axes and evidence references.",
-                "Produce 3 to 5 comparison rows with short axis labels and concise implications.",
-                "Produce exactly 2 SWOT entries, one for LG Energy Solution and one for CATL.",
-                "Produce exactly 2 scorecards, one for LG Energy Solution and one for CATL.",
-                "Limit SWOT lists to at most 3 items per section and use 1 to 3 evidence refs per row or scorecard.",
-                "Each score must be 1 to 5 or null, and every scorecard must include a non-empty rationale and evidence refs.",
-                "If evidence is weak or incomplete, add a ClaimTrace item to low_confidence_claims instead of guessing.",
+                "ComparisonOutput 객체를 반환한다.",
+                "두 기업 프로필을 동일한 비교 축과 근거 기준으로 비교한다.",
+                "3~5개의 comparison row를 만들고 strategy_axis와 implication은 짧은 한국어로 작성한다.",
+                "SWOT entry는 정확히 2개여야 하며 LG Energy Solution 1개, CATL 1개를 만든다.",
+                "scorecard는 정확히 2개여야 하며 LG Energy Solution 1개, CATL 1개를 만든다.",
+                "SWOT 각 항목은 최대 3개 bullet 수준으로 제한하고, 각 row 또는 scorecard에는 1~3개의 evidence ref를 사용한다.",
+                "각 점수는 1~5 또는 null이어야 하며, score_rationale은 비어 있지 않은 한국어 문장이어야 한다.",
+                "근거가 약하거나 불완전하면 추정하지 말고 low_confidence_claims에 ClaimTrace를 추가한다.",
             ]
         ),
         input_text=json.dumps(payload, ensure_ascii=False, indent=2),
@@ -150,9 +152,10 @@ def build_review_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "Return a ReviewResult object.",
-                "Mark passed=false if evidence links are weak, comparison axes are inconsistent, or score rationale is unsupported.",
-                "If a revision target is needed, use one of: market_research, lges_analysis, catl_analysis, comparison.",
+                "ReviewResult 객체를 반환한다.",
+                "review_issues는 한국어로 작성한다.",
+                "근거 연결이 약하거나 비교 축이 불일치하거나 score rationale이 근거로 뒷받침되지 않으면 passed=false로 표시한다.",
+                "revision target이 필요하면 market_research, lges_analysis, catl_analysis, comparison 중 하나를 사용한다.",
             ]
         ),
         input_text=json.dumps(payload, ensure_ascii=False, indent=2),
@@ -166,9 +169,9 @@ def build_review_repair_prompt(
 ) -> PromptBundle:
     input_text = "\n\n".join(
         [
-            f"Original prompt name:\n{original_prompt.name}",
-            f"Original input:\n{original_prompt.input_text}",
-            "Review result:\n"
+            f"원본 프롬프트 이름:\n{original_prompt.name}",
+            f"원본 입력:\n{original_prompt.input_text}",
+            "리뷰 결과:\n"
             + json.dumps(review_result.model_dump(mode="json"), ensure_ascii=False, indent=2),
         ]
     )
@@ -177,7 +180,7 @@ def build_review_repair_prompt(
         instructions="\n\n".join(
             [
                 COMMON_GUARDRAILS,
-                "Revise the previous output according to the review result without introducing new unsupported claims.",
+                "리뷰 결과를 반영해 이전 출력을 수정하되, 새로운 무근거 주장을 추가하지 않는다.",
             ]
         ),
         input_text=input_text,

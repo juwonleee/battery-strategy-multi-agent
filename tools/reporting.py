@@ -7,6 +7,8 @@ from state import AgentState, EvidenceRef, ReportArtifact
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 except ImportError:  # pragma: no cover - handled at runtime
     A4 = None
@@ -14,6 +16,8 @@ except ImportError:  # pragma: no cover - handled at runtime
     SimpleDocTemplate = None
     Spacer = None
     getSampleStyleSheet = None
+    pdfmetrics = None
+    UnicodeCIDFont = None
 
 
 class ReportExportError(RuntimeError):
@@ -30,83 +34,83 @@ def assemble_markdown_report(state: AgentState) -> str:
     review_result = state.get("review_result")
 
     sections = [
-        "# Battery Strategy Comparison Report",
+        "# 배터리 전략 비교 보고서",
         "",
-        "## Summary",
-        f"- Goal: {state['goal']}",
-        f"- Market summary: {market_context.summary}",
-        f"- LGES positioning: {_first_or_default(lges_profile.diversification_strategy)}",
-        f"- CATL positioning: {_first_or_default(catl_profile.diversification_strategy)}",
-        f"- Headline implication: {_first_or_default([row.implication for row in comparison_matrix])}",
+        "## 요약",
+        f"- 목표: {state['goal']}",
+        f"- 시장 요약: {market_context.summary}",
+        f"- LGES 포지셔닝: {_first_or_default(lges_profile.diversification_strategy)}",
+        f"- CATL 포지셔닝: {_first_or_default(catl_profile.diversification_strategy)}",
+        f"- 핵심 시사점: {_first_or_default([row.implication for row in comparison_matrix])}",
         "",
-        "## Market Background",
+        "## 시장 배경",
         market_context.summary,
         "",
-        "### Key Findings",
+        "### 핵심 발견",
         *_render_bullets(market_context.key_findings),
         "",
-        "### Comparison Axes",
+        "### 비교 축",
         *_render_bullets(market_context.comparison_axes),
         "",
         f"## {lges_profile.company_name}",
-        f"### Business Overview\n{lges_profile.business_overview}",
+        f"### 사업 개요\n{lges_profile.business_overview}",
         "",
-        "### Core Products",
+        "### 핵심 제품",
         *_render_bullets(lges_profile.core_products),
         "",
-        "### Diversification Strategy",
+        "### 다각화 전략",
         *_render_bullets(lges_profile.diversification_strategy),
         "",
-        "### Regional Strategy",
+        "### 지역 전략",
         *_render_bullets(lges_profile.regional_strategy),
         "",
-        "### Technology Strategy",
+        "### 기술 전략",
         *_render_bullets(lges_profile.technology_strategy),
         "",
-        "### Financial Indicators",
+        "### 재무 지표",
         *_render_financials(lges_profile.financial_indicators),
         "",
-        "### Risk Factors",
+        "### 리스크 요인",
         *_render_bullets(lges_profile.risk_factors),
         "",
         f"## {catl_profile.company_name}",
-        f"### Business Overview\n{catl_profile.business_overview}",
+        f"### 사업 개요\n{catl_profile.business_overview}",
         "",
-        "### Core Products",
+        "### 핵심 제품",
         *_render_bullets(catl_profile.core_products),
         "",
-        "### Diversification Strategy",
+        "### 다각화 전략",
         *_render_bullets(catl_profile.diversification_strategy),
         "",
-        "### Regional Strategy",
+        "### 지역 전략",
         *_render_bullets(catl_profile.regional_strategy),
         "",
-        "### Technology Strategy",
+        "### 기술 전략",
         *_render_bullets(catl_profile.technology_strategy),
         "",
-        "### Financial Indicators",
+        "### 재무 지표",
         *_render_financials(catl_profile.financial_indicators),
         "",
-        "### Risk Factors",
+        "### 리스크 요인",
         *_render_bullets(catl_profile.risk_factors),
         "",
-        "## Comparison Matrix",
+        "## 비교표",
         *_render_comparison_table(comparison_matrix),
         "",
         "## SWOT",
         *_render_swot(swot_matrix),
         "",
-        "## Scorecard",
+        "## 점수표",
         *_render_scorecards(scorecard),
         "",
-        "## Implications",
+        "## 시사점",
         *_render_implications(comparison_matrix, scorecard),
         "",
-        "## Review",
-        f"- Passed: {'Yes' if review_result and review_result.passed else 'No'}",
-        *_render_bullets(state.get("review_issues", []) or ["No outstanding review issues."]),
+        "## 리뷰",
+        f"- 통과 여부: {'예' if review_result and review_result.passed else '아니오'}",
+        *_render_bullets(state.get("review_issues", []) or ["추가 리뷰 이슈 없음"]),
         "",
-        "## References",
+        "## 참고문헌",
         *_render_references(state),
     ]
     return "\n".join(line for line in sections if line is not None).strip() + "\n"
@@ -126,6 +130,9 @@ def export_pdf_report(markdown: str, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc = SimpleDocTemplate(str(output_path), pagesize=A4)
     styles = getSampleStyleSheet()
+    font_name = _configure_pdf_font()
+    for style_name in ("Title", "Heading1", "Heading2", "BodyText"):
+        styles[style_name].fontName = font_name
     story = []
     for raw_line in markdown.splitlines():
         line = raw_line.strip()
@@ -183,7 +190,7 @@ def _render_financials(indicators: list) -> list[str]:
 
 def _render_comparison_table(rows: list) -> list[str]:
     lines = [
-        "| Axis | LGES | CATL | Difference | Implication |",
+        "| 비교 축 | LGES | CATL | 차이점 | 시사점 |",
         "|---|---|---|---|---|",
     ]
     for row in rows:
@@ -199,10 +206,10 @@ def _render_swot(entries: list) -> list[str]:
         lines.extend(
             [
                 f"### {entry.company_name}",
-                f"- Strengths: {_join_or_default(entry.strengths)}",
-                f"- Weaknesses: {_join_or_default(entry.weaknesses)}",
-                f"- Opportunities: {_join_or_default(entry.opportunities)}",
-                f"- Threats: {_join_or_default(entry.threats)}",
+                f"- 강점: {_join_or_default(entry.strengths)}",
+                f"- 약점: {_join_or_default(entry.weaknesses)}",
+                f"- 기회: {_join_or_default(entry.opportunities)}",
+                f"- 위협: {_join_or_default(entry.threats)}",
                 "",
             ]
         )
@@ -215,11 +222,11 @@ def _render_scorecards(scorecards: list) -> list[str]:
         lines.extend(
             [
                 f"### {card.company_name}",
-                f"- Diversification Strength: {_score_or_default(card.diversification_strength)}",
-                f"- Cost Competitiveness: {_score_or_default(card.cost_competitiveness)}",
-                f"- Market Adaptability: {_score_or_default(card.market_adaptability)}",
-                f"- Risk Exposure: {_score_or_default(card.risk_exposure)}",
-                f"- Rationale: {card.score_rationale}",
+                f"- 다각화 강도: {_score_or_default(card.diversification_strength)}",
+                f"- 비용 경쟁력: {_score_or_default(card.cost_competitiveness)}",
+                f"- 시장 적응력: {_score_or_default(card.market_adaptability)}",
+                f"- 리스크 노출도: {_score_or_default(card.risk_exposure)}",
+                f"- 근거: {card.score_rationale}",
                 "",
             ]
         )
@@ -279,3 +286,15 @@ def _first_or_default(values: list[str]) -> str:
 
 def _score_or_default(value: int | None) -> str:
     return str(value) if value is not None else "정보 부족"
+
+
+def _configure_pdf_font() -> str:
+    if pdfmetrics is None or UnicodeCIDFont is None:
+        return "Helvetica"
+
+    font_name = "HYSMyeongJo-Medium"
+    try:
+        pdfmetrics.getFont(font_name)
+    except KeyError:
+        pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+    return font_name

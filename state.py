@@ -225,7 +225,7 @@ def build_initial_state(
         message="Initial workflow state created.",
     )
     return {
-        "goal": "Compare LGES and CATL diversification strategies",
+        "goal": "LGES와 CATL의 다각화 전략을 비교 분석한다",
         "target_companies": ["LG Energy Solution", "CATL"],
         "config": config,
         "research_questions": [],
