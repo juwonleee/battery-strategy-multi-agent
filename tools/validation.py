@@ -159,7 +159,6 @@ def validate_final_delivery_state(state: AgentState) -> ValidationResult:
         ("report_blueprint", state.get("report_blueprint")),
         ("synthesis_claims", state.get("synthesis_claims")),
         ("supervisor_score_rationales", state.get("supervisor_score_rationales")),
-        ("selected_comparison_rows", state.get("selected_comparison_rows")),
         ("supervisor_swot", state.get("supervisor_swot")),
         ("executive_summary", state.get("executive_summary")),
         ("implications", state.get("implications")),

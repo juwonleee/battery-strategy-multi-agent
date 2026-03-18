@@ -411,7 +411,20 @@ def assemble_html_report(state: AgentState) -> str:
 
 def _build_report_spec(state: AgentState) -> ReportSpec:
     existing_report_spec = state.get("report_spec")
-    if existing_report_spec is not None:
+    has_supervisor_sections = any(
+        [
+            state.get("executive_summary"),
+            state.get("company_strategy_summaries"),
+            state.get("quick_comparison_panel"),
+            state.get("selected_comparison_rows") is not None,
+            state.get("reference_only_rows"),
+            state.get("supervisor_swot"),
+            state.get("supervisor_score_rationales"),
+            state.get("implications"),
+            state.get("limitations"),
+        ]
+    )
+    if existing_report_spec is not None and not has_supervisor_sections:
         charts = existing_report_spec.charts
         if state.get("chart_selection"):
             charts = state["chart_selection"]
@@ -588,7 +601,7 @@ def _build_comparison_framework(state: AgentState) -> list[str]:
     return [
         f"비교 축: {', '.join(labels[item] for item in blueprint.comparison_axes)}",
         "직접 비교 가능한 지표만 본표에 반영하고, 기준 불일치 지표는 참고 지표표로 분리한다.",
-        "워커는 evidence packet만 생성하며, 최종 문장과 종합 판단은 Supervisor가 직접 작성한다.",
+        "기업 공시와 시장 보고서를 바탕으로 정량 지표와 전략 문장을 함께 해석했다.",
     ]
 
 
@@ -685,8 +698,11 @@ def _render_metric_comparison_table_markdown(rows: list, manifest_map: dict) -> 
         "| 항목 | 기간 | LGES | CATL | 구분 | 해석 | 근거 |",
         "|---|---|---|---|---|---|---|",
     ]
-    if not rows:
-        lines.append("| 정보 부족 | - | - | - | - | - | - |")
+    if not rows or _is_empty_comparison_placeholder(rows):
+        lines.append(
+            "| 직접 비교 가능 지표 없음 | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 | "
+            "이번 제출 범위에서 동일 기준으로 직접 비교 가능한 정량 지표를 확보하지 못했다. | 해당 없음 |"
+        )
         return lines
     for row in rows:
         lines.append(
@@ -699,7 +715,7 @@ def _render_metric_comparison_table_markdown(rows: list, manifest_map: dict) -> 
 
 def _render_chart_specs_markdown(charts: list[ChartSpec]) -> list[str]:
     if not charts:
-        return ["- 정보 부족"]
+        return ["- 직접 비교 가능한 정량 차트를 생성하지 못해 표와 본문 해석으로 대체했다."]
 
     lines: list[str] = []
     for chart in charts:
@@ -755,11 +771,19 @@ def _render_reference_lines(report_spec: ReportSpec, manifest_map: dict, claim_m
     if not refs:
         return ["1. 정보 부족"]
     lines = []
-    for index, ref in enumerate(refs, start=1):
+    rendered = []
+    seen = set()
+    for ref in refs:
         label = manifest_map.get(ref.document_id)
         title = label.title if label else ref.document_id
         page = f", p.{ref.page}" if ref.page is not None else ""
-        lines.append(f"{index}. {title}{page}")
+        rendered_line = f"{title}{page}"
+        if rendered_line in seen:
+            continue
+        seen.add(rendered_line)
+        rendered.append(rendered_line)
+    for index, rendered_line in enumerate(rendered, start=1):
+        lines.append(f"{index}. {rendered_line}")
     return lines
 
 
@@ -787,8 +811,8 @@ def _render_company_section_html(company_name, atomic_claims, metric_claims, man
 
 
 def _render_metric_comparison_table_html(rows, manifest_map) -> str:
-    if not rows:
-        return '<p class="empty">정보 부족</p>'
+    if not rows or _is_empty_comparison_placeholder(rows):
+        return '<p class="empty">직접 비교 가능한 정량 지표를 확보하지 못해 본표는 비워 두고 해석 문단으로 대체했다.</p>'
     body = "".join(
         f"<tr><td>{_html(row.metric_name)}</td><td>{_html(row.period or '공시 없음')}</td>"
         f"<td>{_html(row.lges_value or '공시 없음')}</td><td>{_html(row.catl_value or '공시 없음')}</td>"
@@ -805,16 +829,16 @@ def _render_metric_comparison_table_html(rows, manifest_map) -> str:
 
 def _render_chart_specs_html(charts: list[ChartSpec]) -> str:
     if not charts:
-        return '<p class="empty">정보 부족</p>'
+        return '<p class="empty">직접 비교 가능한 정량 차트를 생성하지 못해 표와 본문 해석으로 대체했다.</p>'
 
     cards = []
     for chart in charts:
         headers = "".join(f"<th>{_html(period)}</th>" for period in chart.x_axis_periods)
         rows = "".join(
             "<tr>"
-            f'<td class="chart-series-label">{_html(series.label)}</td>'
-            + "".join(
-                f"<td>{_html('-' if value is None else str(value))}</td>"
+                f'<td class="chart-series-label">{_html(series.label)}</td>'
+                + "".join(
+                f"<td>{_html('공시 없음' if value is None else str(value))}</td>"
                 for value in series.values
             )
             + "</tr>"
@@ -938,10 +962,40 @@ def _collect_report_references(report_spec: ReportSpec, claim_map: dict) -> list
         claim = claim_map.get(claim_id)
         if claim is not None:
             refs.extend(claim.evidence_refs)
-    unique = {}
+    unique: dict[tuple[str, str | None, int | None], EvidenceRef] = {}
     for ref in refs:
-        unique[(ref.document_id, ref.chunk_id, ref.page)] = ref
-    return list(unique.values())
+        key = (ref.document_id, ref.chunk_id, ref.page)
+        unique[key] = ref
+
+    deduped: dict[tuple[str, int | None], EvidenceRef] = {}
+    has_paged_doc_ids = {
+        ref.document_id
+        for ref in unique.values()
+        if ref.page is not None
+    }
+    for ref in unique.values():
+        if ref.page is None and ref.document_id in has_paged_doc_ids:
+            continue
+        deduped[(ref.document_id, ref.page)] = ref
+
+    title_map = {
+        item.document_id: item.title
+        for item in report_spec.references
+    }
+    return sorted(
+        deduped.values(),
+        key=lambda ref: (
+            title_map.get(ref.document_id, ref.document_id),
+            ref.page if ref.page is not None else 10**9,
+        ),
+    )
+
+
+def _is_empty_comparison_placeholder(rows: list) -> bool:
+    if len(rows) != 1:
+        return False
+    row = rows[0]
+    return getattr(row, "metric_name", "") == "직접 비교 가능 지표 없음"
 
 
 def _markdown_bullets_to_html(lines: list[str]) -> str:

@@ -222,7 +222,10 @@ def supervisor_agent(state: AgentState) -> AgentState:
         }
     if (
         not state.get("executive_summary")
-        or not state.get("selected_comparison_rows")
+        or (
+            not state.get("selected_comparison_rows")
+            and not state.get("reference_only_rows")
+        )
         or not state.get("supervisor_swot")
         or not state.get("supervisor_score_rationales")
         or not state.get("final_judgment")
