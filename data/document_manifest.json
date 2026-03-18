@@ -1,1 +1,35 @@
-[]
+[
+  {
+    "document_id": "iea-ev-outlook-2025-market",
+    "title": "IEA Global EV Outlook 2025",
+    "source_path": "data/raw/IEA Global EV Outlook 2025.pdf",
+    "source_type": "industry_report",
+    "company_scope": "market",
+    "published_at": "2025-05-01",
+    "page_range": "1-22"
+  },
+  {
+    "document_id": "lges-25q4-performance",
+    "title": "25_4Q_LGES_business_performance_F_EN",
+    "source_path": "data/raw/25_4Q_LGES_business_performance_F_EN.pdf",
+    "source_type": "company_report",
+    "company_scope": "lges",
+    "page_range": "1-8"
+  },
+  {
+    "document_id": "lges-ceo-keynote",
+    "title": "LGES CEO Keynote",
+    "source_path": "data/raw/LGES CEO Keynote.pdf",
+    "source_type": "presentation",
+    "company_scope": "lges",
+    "page_range": "1-7"
+  },
+  {
+    "document_id": "catl-prospectus",
+    "title": "CATL Prospectus",
+    "source_path": "data/raw/CATL Prospectus.pdf",
+    "source_type": "regulatory_filing",
+    "company_scope": "catl",
+    "page_range": "1-51"
+  }
+]
