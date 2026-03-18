@@ -196,6 +196,15 @@ def _validate_page_number(page: int, total_pages: int) -> int:
 
 def _normalize_text(text: str) -> str:
     cleaned = text.replace("\x00", " ")
+    # Remove PDF Private Use Area characters (font symbol mis-decoding, \uf000-\uffff range)
+    cleaned = re.sub(r"[\uf000-\uffff]", "", cleaned)
+    # Remove PDF table cell separator artifacts encoded as /H<4-digits> (e.g. /H1118/H1118...)
+    # Use exactly 4 digits to avoid greedily consuming trailing numeric values like 328,593,988
+    cleaned = re.sub(r"(/H\d{4})+", " ", cleaned)
+    # Replace box-drawing characters (table border lines) with a space
+    cleaned = re.sub(r"[\u2500-\u257f\u2580-\u259f]", " ", cleaned)
+    # Strip Windows-1252 control characters mis-decoded into the C1 range (\x80-\x9f)
+    cleaned = re.sub(r"[\x80-\x9f]", "", cleaned)
     cleaned = re.sub(r"\s+\n", "\n", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     cleaned = re.sub(r"[ \t]+", " ", cleaned)
