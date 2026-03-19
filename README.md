@@ -117,41 +117,71 @@ app.py  main()
 ### End-to-End Workflow
 
 ```mermaid
-flowchart TD
-    START([app.py start]) --> PRE[Document Preprocessing\nPDF → chunks → FAISS index]
-    PRE --> INIT[build_initial_state]
-    INIT --> LOOP{run_once loop\nmax 20 iterations}
+flowchart LR
+    PRE["📄 Document\nPreprocessing\nPDF → FAISS"]
+    SBP["① supervisor_blueprint\n비교 축 4개 고정"]
+    WORK["② Workers\nmarket / lges / catl\nfact 추출"]
+    CMP["③ comparison\nevidence 합성"]
+    SS["④ supervisor_synthesis\nSWOT · 점수 · 최종판단"]
+    REV{"⑤ review\n감리"}
+    EXPORT["📑 Export\n.md / .html / .pdf"]
 
-    LOOP --> SUP[supervisor_agent\n상태 검사 → 다음 step 결정]
-
-    SUP -->|report_blueprint 없음| SBP[supervisor_blueprint\n비교 축 4개 고정\nworker contract 정의]
-    SUP -->|market_context 없음| MR[market_research\nmarket fact extraction]
-    SUP -->|lges_profile 없음| LA[lges_analysis\nLGES fact + metric extraction]
-    SUP -->|catl_profile 없음| CA[catl_analysis\nCATL fact + metric extraction]
-    SUP -->|synthesis_claims 없음| CMP[comparison\ncandidate evidence packet 생성]
-    SUP -->|supervisor sections 없음| SS[supervisor_synthesis\n최종 표·SWOT·판단 작성]
-    SUP -->|review_result 없음| REV[review\n근거 정합성 감리]
-    SUP -->|review pass| FIN[finish]
-
-    SBP --> LOOP
-    MR --> LOOP
-    LA --> LOOP
-    CA --> LOOP
-    CMP --> LOOP
-    SS --> LOOP
-    REV -->|passed| FIN
-    REV -->|failed → revision_target| RESET[REVIEW_INVALIDATIONS\ndownstream fields 선택적 초기화]
-    RESET --> LOOP
-
-    FIN --> VGATE{validate_final_delivery_state\nhard gate 검사}
-    VGATE -->|hard_errors 있음| BLOCKED[export 차단\nstatus = failed]
-    VGATE -->|통과| EXPORT[assemble + export\n.md / .html / .pdf]
-    EXPORT --> LOG[write_execution_log\nlogs/app.log JSONL]
+    PRE --> SBP
+    SBP --> WORK
+    WORK --> CMP
+    CMP --> SS
+    SS --> REV
+    REV -->|"passed"| EXPORT
+    REV -->|"failed\n→ revision_target"| WORK
 ```
 
 ---
 
 ## Agent Pipeline
+
+### Execution Sequence
+
+```mermaid
+sequenceDiagram
+    participant APP as app.py
+    participant SUP as supervisor_agent
+    participant SBP as supervisor_blueprint
+    participant MR as market_research
+    participant LA as lges_analysis
+    participant CA as catl_analysis
+    participant CMP as comparison
+    participant SS as supervisor_synthesis
+    participant REV as review
+    participant EXP as export
+
+    APP->>SUP: run_once() 시작
+    SUP->>SBP: ① 비교 축 고정 지시
+    SBP-->>SUP: report_blueprint
+
+    SUP->>MR: ② Worker 실행 지시
+    SUP->>LA: ② Worker 실행 지시 (병렬)
+    SUP->>CA: ② Worker 실행 지시 (병렬)
+    MR-->>SUP: market_facts · market_context
+    LA-->>SUP: lges_facts · lges_profile · metrics
+    CA-->>SUP: catl_facts · catl_profile · metrics
+
+    SUP->>CMP: ③ evidence 합성 지시
+    CMP-->>SUP: synthesis_claims · score_criteria · rows
+
+    SUP->>SS: ④ 최종 판단 작성 지시
+    SS-->>SUP: SWOT · 점수 · final_judgment · executive_summary
+
+    SUP->>REV: ⑤ 감리 요청
+    alt review passed
+        REV-->>SUP: passed
+        SUP->>EXP: hard gate → .md / .html / .pdf
+    else review failed
+        REV-->>SUP: failed · revision_target
+        SUP->>CMP: downstream fields 초기화 후 재실행
+    end
+```
+
+---
 
 ### Detailed Agent Pipeline
 
@@ -353,44 +383,41 @@ CATL_REQUIRED_METRIC_FAMILIES = (
 
 이 프로젝트의 RAG는 웹 검색 대체물이 아니라 **공식 문서 기반 evidence layer**입니다.
 
-```text
-data/raw/*.pdf
-  └─ tools.preprocessing
-        PDF 읽기 → 청킹 (1200자, overlap 200)
-        → data/processed/corpus.jsonl
-        → data/processed/document_manifest.processed.json
+```mermaid
+flowchart TD
+    subgraph INGEST["📥 Ingestion (1회)"]
+        PDF["data/raw/*.pdf"]
+        CHUNK["청킹\n1200자 · overlap 200"]
+        FAISS["FAISS 인덱스\n+ faiss_metadata.jsonl"]
+        PDF --> CHUNK --> FAISS
+    end
 
-data/processed/corpus.jsonl
-  └─ tools.retrieval
-        intfloat/multilingual-e5-large embedding
-        → FAISS 인덱스 (data/index/faiss.index)
-        → 메타데이터 (data/index/faiss_metadata.jsonl)
+    subgraph RETRIEVE["🔍 Retrieval (Agent별)"]
+        Q1["market scope\nquery"]
+        Q2["lges scope\nquery"]
+        Q3["catl scope\nquery"]
+        FAISS --> Q1 & Q2 & Q3
+        Q1 --> E1["EvidenceRef\n(market)"]
+        Q2 --> E2["EvidenceRef\n(lges)"]
+        Q3 --> E3["EvidenceRef\n(catl)"]
+    end
 
-각 worker agent
-  └─ scope별 retrieval query (top-k=6)
-        → EvidenceRef 수집
-        → FactExtractionOutput (구조화 claim + evidence_refs)
+    subgraph EXTRACT["🧠 Extraction (Worker별)"]
+        E1 --> MF["MarketFactExtractionOutput\nmarket_facts · market_context"]
+        E2 --> LF["LGESFactExtractionOutput\nlges_facts · lges_profile"]
+        E3 --> CF["CATLFactExtractionOutput\ncatl_facts · catl_profile"]
+        LF & CF --> NORM["NormalizedMetric\nbasis · period · unit 보존\nguidance vs actual 구분"]
+    end
 
-tools.normalization
-  └─ MetricFactClaim → NormalizedMetric
-        (basis / period / unit 보존, guidance vs actual 구분)
-        → profitability_reported_rows (direct vs reference_only 분리)
+    subgraph COMPARE["⚖️ Comparison (새 retrieval 없음)"]
+        MF & LF & CF & NORM --> SPEC["ComparisonInputSpec\n회사별 최대 12 claim"]
+        SPEC --> OUT["synthesis_claims\nscore_criteria · rows"]
+    end
 
-tools.comparison_contract
-  └─ fact layer → ComparisonInputSpec (회사별 최대 12 claim)
-
-comparison agent
-  └─ ComparisonInputSpec만 사용 (새 retrieval 없음)
-        → ComparisonEvidenceOutput (synthesis claims, score criteria, rows)
-
-tools.reporting.build_report_spec
-  └─ supervisor-owned state → ReportSpec (제출 계약 객체)
-
-tools.reporting
-  └─ ReportSpec → Markdown → HTML → Playwright PDF
+    OUT --> RPT["ReportSpec → MD · HTML · PDF"]
 ```
 
-`comparison` agent는 claim catalog(`ComparisonInputSpec`)만 사용하고 새 검색을 수행하지 않습니다. 이로써 비교 단계에서 새로운 외부 근거가 유입되는 것을 막습니다.
+`comparison` agent는 `ComparisonInputSpec`만 사용하고 새 검색을 수행하지 않습니다. 이로써 비교 단계에서 새로운 외부 근거가 유입되는 것을 막습니다.
 
 ---
 
