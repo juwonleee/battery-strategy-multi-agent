@@ -272,8 +272,6 @@ flowchart TD
 
 ---
 
----
-
 ## Decision Framework
 
 최종 보고서의 점수와 판단은 아래 4개 기준으로 정리됩니다. 근거가 부족하면 추정하지 않고 `score: null`로 표기합니다.
