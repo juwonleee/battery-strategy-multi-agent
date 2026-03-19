@@ -2,7 +2,7 @@
 
 LG에너지솔루션(LGES)과 CATL의 포트폴리오 다각화 전략을 근거 기반으로 비교 분석하기 위한 Agentic RAG 프로젝트입니다. 공식 PDF 문서를 FAISS로 인덱싱해 retrieval evidence를 확보하고, Supervisor 패턴 Multi-Agent 워크플로우로 시장 배경 · 기업별 전략 · 정량 비교 · SWOT · 점수화 · 최종 판단까지 자동으로 조립해 Markdown / HTML / PDF 보고서를 생성합니다.
 
-> 단순 기업 소개가 아니라, 비교 축을 먼저 고정하고 근거를 단계별로 축적한 뒤 최종 판단까지 도출하는 파이프라인입니다.
+> 비교 축을 먼저 정하고, 근거를 단계별로 축적한 뒤 최종 판단까지 이어지도록 구성한 파이프라인입니다.
 
 ---
 
@@ -26,13 +26,13 @@ LG에너지솔루션(LGES)과 CATL의 포트폴리오 다각화 전략을 근거
 
 ### Design Intent
 
-이 시스템의 아키텍처 목표는 두 가지입니다.
+이 시스템은 두 가지 설계 의도를 기준으로 구성했습니다.
 
-첫째, `비교 축 통제`. agent마다 자유롭게 비교 기준을 잡으면 결론이 흔들리므로, Supervisor Blueprint 단계에서 비교 축 4개를 먼저 고정하고 이후 모든 단계가 그 계약을 따릅니다.
+첫째, `비교 축 통제`입니다. agent마다 비교 기준을 다르게 잡으면 결론이 흔들릴 수 있어, Supervisor Blueprint 단계에서 비교 축 4개를 먼저 정하고 이후 단계가 같은 기준을 사용하도록 만들었습니다.
 
-둘째, `output ownership 명시`. worker는 근거(evidence)를 생산하는 역할로 제한하고, 최종 보고서 문장 · 점수 해석 · SWOT 종합 · 최종 판단은 Supervisor Synthesis만 작성합니다. 이 분리를 두지 않으면 누가 어떤 판단을 했는지가 흐려져 review와 retry가 어려워집니다.
+둘째, `output ownership 분리`입니다. worker는 근거(evidence)를 수집하고 정리하는 역할을 맡고, 최종 보고서 문장 · 점수 해석 · SWOT 종합 · 최종 판단은 Supervisor Synthesis에서 작성하도록 역할을 나눴습니다. 이렇게 구분해 두면 어떤 단계에서 어떤 판단이 나왔는지 추적하기 쉬워지고, review나 retry를 걸 때도 기준이 명확해집니다.
 
-즉 이 시스템은 "LLM이 멋진 문장을 쓰게 하는 것"이 목적이 아니라, **근거를 잃지 않은 채 비교 판단까지 가는 파이프라인**을 만드는 것이 목적입니다.
+전체적으로는 문장 생성 자체보다, **근거를 유지한 상태에서 비교 판단까지 이어지는 흐름**을 만드는 쪽에 초점을 두었습니다.
 
 ---
 
@@ -84,23 +84,9 @@ graph LR
 
 ---
 
-### Why Supervisor Pattern
-
-이 과제는 단순 검색 결과 병합보다 `비교 축 통제` · `근거 기반 판단` · `재시도 및 수정 루프`가 더 중요합니다.
-
-| 패턴 | 이 과제와의 적합성 | 선택 여부 |
-|-----|-----------------|---------|
-| Router | 단계 선택은 단순하지만 최종 판단 책임이 흐려질 수 있음 | 미채택 |
-| Distributor | 병렬 작업 분배에는 유리하지만 최종 보고서 ownership이 분산됨 | 미채택 |
-| Supervisor | 상태 기반 제어, revision loop, 최종 아웃풋 ownership 명시 용이 | **채택** |
-
-이 저장소에서 Supervisor는 단순 라우터가 아닙니다. `report_blueprint`를 먼저 만들고, review 결과에 따라 특정 단계만 재실행하며, 최종 보고서 섹션의 owner를 고정합니다.
-
----
-
 ### Execution Model: Manual Supervisor Loop
 
-이 프로젝트는 LangGraph의 `StateGraph.compile()` 방식을 사용하지 않습니다. `graph.py`의 `run_once()` 함수가 매 iteration마다 `supervisor_agent(state)` → `AGENT_REGISTRY[step](state)` 순서로 직접 실행하는 **수동 루프 구조**입니다.
+이 프로젝트에서는 LangGraph의 `StateGraph.compile()` 대신 `graph.py`의 `run_once()` 함수를 중심으로 한 수동 루프 구조를 사용했습니다. 각 iteration마다 `supervisor_agent(state)` → `AGENT_REGISTRY[step](state)` 순서로 실행됩니다.
 
 ```text
 app.py  main()
@@ -110,7 +96,7 @@ app.py  main()
           └─ AGENT_REGISTRY[step](state)        # worker 또는 synthesis 실행
 ```
 
-이 선택의 이유는 `REVIEW_INVALIDATIONS` 기반의 downstream field 선택적 초기화, schema retry와 review retry의 독립적 예산 관리, 그리고 revision target에 따른 정밀한 상태 복구를 직접 제어하기 위해서입니다. LangGraph의 선언형 그래프로는 이 수준의 세밀한 상태 조작이 어렵습니다.
+이 방식을 사용한 이유는 `REVIEW_INVALIDATIONS` 기반의 downstream field 선택적 초기화, schema retry와 review retry의 독립적 예산 관리, revision target별 상태 복구를 코드에서 직접 다루기 쉬웠기 때문입니다. 현재 구현에서는 선언형 그래프보다 수동 루프가 상태 전이를 더 세밀하게 표현하는 데 맞았습니다.
 
 ---
 
@@ -183,37 +169,6 @@ sequenceDiagram
 
 ---
 
-### Detailed Agent Pipeline
-
-| Step | 입력 | 주요 동작 | 출력 | 이 단계가 필요한 이유 |
-|------|------|----------|------|----------------------|
-| `supervisor_blueprint` | goal, target_companies, source_documents | 비교 축 4개 고정, worker 질문 세트 정의, comparability precheck 수행 | `report_blueprint` | agent마다 제멋대로 비교 기준을 잡지 않게 막기 위해 |
-| `market_research` | blueprint, market retrieval hits | 시장 배경 fact 단위 추출, 두 기업에 공통 적용할 비교 축 힌트 정리 | `market_facts`, `market_context`, `market_context_summary` | 공통 외생 변수와 시장 문맥을 먼저 정리해 기업 분석에 컨텍스트 제공 |
-| `lges_analysis` | blueprint, market summary, LGES retrieval hits | LGES 전략 · 리스크 · 정량 근거를 구조화 claim으로 추출, normalization 실행 | `lges_facts`, `lges_profile`, `lges_normalized_metrics`, `profitability_reported_rows` | LGES를 독립된 evidence packet으로 보존해 CATL과 섞이지 않게 하기 위해 |
-| `catl_analysis` | blueprint, market summary, CATL retrieval hits | CATL 전략 · 리스크 · 정량 근거를 구조화 claim으로 추출, normalization 실행 | `catl_facts`, `catl_profile`, `catl_normalized_metrics`, `profitability_reported_rows` | LGES와 동일한 이유로 CATL evidence를 독립 보존 |
-| `comparison` | market/company fact packet, normalized metrics | 검증된 claim catalog(최대 각 12개)만 사용해 candidate synthesis claims, score criteria, metric comparison rows 생성 | `comparison_input_spec`, `synthesis_claims`, `score_criteria`, `metric_comparison_rows`, `low_confidence_claims` | 비교 재료를 만들되 최종 판단 ownership은 supervisor에 유보 |
-| `supervisor_synthesis` | blueprint + fact layer + comparison layer | 최종 보고서 섹션 직접 작성 — 비교표 선별, SWOT, score rationale, executive summary, final judgment | `selected_comparison_rows`, `reference_only_rows`, `chart_selection`, `executive_summary`, `supervisor_swot`, `supervisor_score_rationales`, `final_judgment`, `implications`, `limitations` | Supervisor가 최종 아웃풋 책임을 직접 소유해야 한다는 설계 원칙 구현 |
-| `review` | report_spec, validation_warnings, low_confidence_claims | 근거-결론 연결 · 비교 축 일관성 · 필수 섹션 누락 감리 | `review_result`, `review_issues` | LLM이 생성한 최종 판단을 제출 계약 관점에서 한 번 더 검증 |
-| `reporting / export` | 최종 state | Markdown / HTML / PDF 조립, hard gate 통과 후 export | `.md`, `.html`, `.pdf`, `.log` | 출력 포맷 분리, 미완성 결과가 export되지 않도록 차단 |
-
----
-
-### Agent Responsibility Matrix
-
-| Stage | Reads | Writes | Forbidden Outputs |
-|------|-------|--------|-------------------|
-| `supervisor_blueprint` | `goal`, `target_companies`, `source_documents` | `report_blueprint` | 최종 보고서 문장, `final_judgment` |
-| `market_research` | `report_blueprint`, retrieval hits | `market_facts`, `market_context`, `market_context_summary` | `executive_summary`, `final_judgment`, `final_swot`, `final_score_rationale` |
-| `lges_analysis` | `report_blueprint`, `market_context_summary`, retrieval hits | `lges_facts`, `lges_profile`, `lges_normalized_metrics`, `profitability_reported_rows` | 최종 보고서 문장, `final_judgment` |
-| `catl_analysis` | `report_blueprint`, `market_context_summary`, retrieval hits | `catl_facts`, `catl_profile`, `catl_normalized_metrics`, `profitability_reported_rows` | 최종 보고서 문장, `final_judgment` |
-| `comparison` | `market_facts`, `lges_facts`, `catl_facts`, normalized metrics | `comparison_input_spec`, `synthesis_claims`, `score_criteria`, `metric_comparison_rows`, `low_confidence_claims` | `executive_summary`, `final_judgment`, final SWOT prose |
-| `supervisor_synthesis` | blueprint + fact layer + comparison layer | supervisor-owned report fields 전체 | worker evidence 재생성, 원문 재검색 |
-| `review` | `report_spec`, `validation_warnings`, `low_confidence_claims` | `review_result`, `review_issues` | 새로운 사업 판단, 임의 수치 생성 |
-
-`forbidden_outputs`는 컨벤션이 아닙니다. `ReportBlueprint` Pydantic `model_validator`가 인스턴스 생성 시점에 각 `WorkerTaskSpec.forbidden_outputs`에 `final_judgment`, `executive_summary`, `final_swot`, `final_score_rationale` 4개가 반드시 포함되는지 검증하며, 누락 시 `ValueError`를 발생시킵니다.
-
----
-
 ### Supervisor Routing and Governance
 
 `agents/supervisor.py`의 `supervisor_agent()`는 `AgentState` 전체를 읽고 아래 우선순위로 다음 step을 결정합니다.
@@ -237,7 +192,7 @@ sequenceDiagram
 
 ### REVIEW_INVALIDATIONS: Downstream Field Reset
 
-review가 실패하거나 schema retry가 발생할 때, Supervisor는 revision target의 **downstream fields만 선택적으로 초기화**합니다. 이 매핑이 `agents/supervisor.py`의 `REVIEW_INVALIDATIONS` 딕셔너리에 step별로 명시돼 있습니다.
+review가 실패하거나 schema retry가 발생하면, Supervisor는 revision target 이후의 **downstream fields만 선택적으로 초기화**합니다. 이 매핑은 `agents/supervisor.py`의 `REVIEW_INVALIDATIONS` 딕셔너리에 step별로 정리해 두었습니다.
 
 ```text
 # 예: review가 "comparison" 단계로 revision을 요청한 경우
@@ -253,7 +208,7 @@ REVIEW_INVALIDATIONS["comparison"] = (
 # → comparison 이전의 market_facts, lges_facts, catl_facts는 그대로 보존
 ```
 
-이 구조 덕분에 "어느 단계의 계약이 깨졌는지 식별하고 그 지점부터만 복구"할 수 있으며, 이전 단계의 비용이 드는 retrieval과 extraction을 반복하지 않습니다.
+이 구조를 사용하면 어느 단계에서 계약이 깨졌는지 확인한 뒤 그 지점부터 다시 실행할 수 있습니다. 그래서 이전 단계의 retrieval이나 extraction을 반복하는 횟수를 줄일 수 있습니다.
 
 retry budget은 `RetryBudget` 모델로 독립 관리됩니다.
 
@@ -269,7 +224,7 @@ class RetryBudget(BaseModel):
 
 ### SWOT Design Decision
 
-이 보고서의 목표는 두 기업을 개별 소개하는 것이 아니라 `LGES vs CATL 비교 판단`입니다.
+이 보고서는 두 기업을 각각 소개하는 형식보다 `LGES vs CATL 비교 판단`에 맞춰 작성하도록 설계했습니다.
 
 SWOT는 회사별 진단으로 생성하되, 시사점과 종합 판단은 비교 결과를 합성한 `supervisor_synthesis`에서만 도출합니다. 개별 SWOT을 길게 풀어버리면 최종 비교 논리가 흐려지기 때문입니다.
 
@@ -289,7 +244,7 @@ soft gate의 `_add_raw_metric_swot_warning`은 SWOT 항목이 "revenue", "margin
 |-----|------|------|
 | `report_blueprint` | `ReportBlueprint` | 비교 축 4개 + comparability precheck + worker task specs |
 
-`ReportBlueprint`의 `model_validator`는 (1) `comparison_axes`가 정해진 4개 축을 정확한 순서로 포함하는지, (2) `worker_task_specs`에 3개 worker가 모두 정의됐는지, (3) 각 worker의 `forbidden_outputs`에 필수 4개 필드가 포함됐는지를 인스턴스 생성 시점에 강제 검증합니다.
+`ReportBlueprint`의 `model_validator`는 (1) `comparison_axes`가 정해진 4개 축을 정확한 순서로 포함하는지, (2) `worker_task_specs`에 3개 worker가 모두 정의됐는지, (3) 각 worker의 `forbidden_outputs`에 필수 4개 필드가 포함됐는지를 인스턴스 생성 시점에 검증합니다.
 
 #### Layer 2 — Fact
 
@@ -304,7 +259,7 @@ soft gate의 `_add_raw_metric_swot_warning`은 SWOT 항목이 "revenue", "margin
 | `profitability_reported_rows` | `list[MetricComparisonRow]` | `lges_analysis` / `catl_analysis` |
 | `citation_refs` | `list[EvidenceRef]` | 누적 |
 
-`LGESFactExtractionOutput`과 `CATLFactExtractionOutput`은 각각 `model_validator`로 **required metric families**를 강제합니다.
+`LGESFactExtractionOutput`과 `CATLFactExtractionOutput`은 각각 `model_validator`를 사용해 **required metric families**가 포함됐는지 확인합니다.
 
 ```python
 LGES_REQUIRED_METRIC_FAMILIES = (
@@ -319,7 +274,7 @@ CATL_REQUIRED_METRIC_FAMILIES = (
 
 이 중 하나라도 `metric_claims`에 없으면 `model_validate()` 시점에 `ValueError`가 발생하고, supervisor는 schema retry를 실행합니다.
 
-`FactExtractionOutput`의 `_validate_claim_scope_alignment` validator는 모든 claim의 `scope`가 extraction scope와 일치하는지도 강제합니다. 이로써 LGES claim이 CATL 컨텍스트에 섞여 들어가는 오염을 방지합니다.
+`FactExtractionOutput`의 `_validate_claim_scope_alignment` validator는 모든 claim의 `scope`가 extraction scope와 일치하는지도 확인합니다. 이 검사를 넣어 LGES claim이 CATL 컨텍스트에 섞이는 상황을 줄였습니다.
 
 #### Layer 3 — Comparison (Candidate)
 
@@ -332,9 +287,9 @@ CATL_REQUIRED_METRIC_FAMILIES = (
 | `comparability_decisions` | `list[MetricComparisonRow]` | direct / reference_only / reject 분류 결과 |
 | `low_confidence_claims` | `list[ClaimTrace]` | 신뢰도가 낮은 claim 목록 |
 
-이 레이어는 supervisor synthesis의 **input 재료**입니다. 최종 보고서가 아닙니다.
+이 레이어는 supervisor synthesis에서 사용하는 **input 재료**로 정리했습니다. 최종 보고서 필드와는 구분해서 다룹니다.
 
-`comparison`이 생성하는 `SynthesisClaim`은 `supporting_claim_ids`가 반드시 2개 이상이어야 하며, 그 ID가 `ComparisonInputSpec.allowed_claim_ids()` 집합에 속하지 않으면 hard gate 오류가 됩니다. 새로운 외부 근거를 발명하는 것을 구조적으로 차단합니다.
+`comparison`이 생성하는 `SynthesisClaim`은 `supporting_claim_ids`를 2개 이상 갖도록 했고, 그 ID가 `ComparisonInputSpec.allowed_claim_ids()` 집합에 없으면 hard gate 오류로 처리합니다. 비교 단계에서는 새 외부 근거를 추가하지 않고, 앞 단계에서 정리한 claim catalog만 사용하도록 맞췄습니다.
 
 #### Layer 4 — Supervisor-Owned Report
 
@@ -353,9 +308,9 @@ CATL_REQUIRED_METRIC_FAMILIES = (
 | `limitations` | `list[str]` | 분석 한계 |
 | `report_spec` | `ReportSpec` | 제출 계약 객체 전체 |
 
-이 레이어는 worker가 절대 쓰지 않습니다. `supervisor_synthesis`와 `report assembly`만 소유합니다.
+이 레이어는 worker 출력과 분리해 두었고, `supervisor_synthesis`와 `report assembly` 단계에서 사용합니다.
 
-`ScoreCriterion.evidence_refs`는 `supporting_claim_ids`에서 상속하지 않고 **materialized field**로 유지합니다. 이를 통해 score 근거가 claim chain이 아닌 실제 문서 위치로 역추적됩니다.
+`ScoreCriterion.evidence_refs`는 `supporting_claim_ids`에서 상속하지 않고 **materialized field**로 유지했습니다. 점수 근거를 실제 문서 위치 기준으로 다시 확인하기 쉽도록 한 선택입니다.
 
 #### Layer 5 — Review / Validation
 
@@ -381,7 +336,7 @@ CATL_REQUIRED_METRIC_FAMILIES = (
 
 ### RAG and Evidence Flow
 
-이 프로젝트의 RAG는 웹 검색 대체물이 아니라 **공식 문서 기반 evidence layer**입니다.
+이 프로젝트의 RAG는 웹 검색을 대체하는 용도보다는 **공식 문서 기반 evidence layer**로 사용하는 쪽에 맞춰 두었습니다.
 
 ```mermaid
 flowchart TD
@@ -417,19 +372,19 @@ flowchart TD
     OUT --> RPT["ReportSpec → MD · HTML · PDF"]
 ```
 
-`comparison` agent는 `ComparisonInputSpec`만 사용하고 새 검색을 수행하지 않습니다. 이로써 비교 단계에서 새로운 외부 근거가 유입되는 것을 막습니다.
+`comparison` agent는 `ComparisonInputSpec`만 사용하고 새 검색은 수행하지 않도록 했습니다. 비교 단계에서 근거 집합이 흔들리지 않게 하려는 이유였습니다.
 
 ---
 
 ### Normalization Layer
 
-배터리 기업 비교에서 가장 흔한 오류는 성격이 다른 숫자를 같은 표에 넣는 것입니다. 이 저장소는 이를 세 단계로 방지합니다.
+배터리 기업 비교에서는 성격이 다른 숫자를 같은 표에 넣는 문제가 자주 생깁니다. 이 저장소에서는 이를 줄이기 위해 세 단계 처리를 사용했습니다.
 
-**1단계 — Metric Family 강제 추출**: `LGESFactExtractionOutput` · `CATLFactExtractionOutput`의 `model_validator`가 required metric families를 검증합니다. 이 검증이 실패하면 worker schema 실패로 처리되고 supervisor가 재시도합니다.
+**1단계 — Metric Family 확인**: `LGESFactExtractionOutput` · `CATLFactExtractionOutput`의 `model_validator`가 required metric families를 검증합니다. 이 검증이 실패하면 worker schema 실패로 처리하고 supervisor가 재시도합니다.
 
 **2단계 — NormalizedMetric 생성**: `tools/normalization.py`가 raw `MetricFactClaim`을 받아 `basis` (`guidance` vs `reported`) · `period` · `unit`을 보존한 채 `NormalizedMetric`으로 변환합니다. CATL의 `net_profit_margin`이 원문에서 직접 추출 불가한 경우 `revenue`와 `profit_for_the_year`에서 파생하며 `is_derived=True`로 마킹합니다.
 
-**3단계 — Comparability 분류**: `MetricComparisonRow.comparability_status`를 `direct` / `reference_only` / `reject`로 분류합니다. `direct`만 비교표에 들어가고, `reference_only`는 별도 표로 분리됩니다. 서로 다른 회계 기준이나 공개 범위 차이로 직접 비교가 어려운 수치를 같은 표에 섞지 않기 위해서입니다.
+**3단계 — Comparability 분류**: `MetricComparisonRow.comparability_status`를 `direct` / `reference_only` / `reject`로 분류합니다. `direct`만 비교표에 넣고, `reference_only`는 별도 표로 분리했습니다. 서로 다른 회계 기준이나 공개 범위 차이가 있는 수치를 같은 표에 바로 섞지 않기 위한 처리입니다.
 
 ---
 
@@ -439,7 +394,7 @@ flowchart TD
 
 `tools/validation.py`는 두 종류의 검증을 실행합니다.
 
-**Hard Gate** — export를 차단하는 규칙입니다. `validate_final_delivery_state()`가 아래를 검사합니다.
+**Hard Gate** — export 여부에 직접 영향을 주는 규칙입니다. `validate_final_delivery_state()`가 아래 항목을 검사합니다.
 
 | Rule Key | 검사 내용 |
 |---------|---------|
@@ -453,7 +408,7 @@ flowchart TD
 | `blueprint-comparison-axes` | blueprint 비교 축 4개 정확성 |
 | `fact-claim-evidence` | 모든 fact claim에 `evidence_refs` 존재 여부 |
 
-**Soft Gate** — 경고로만 기록되며 export를 차단하지 않습니다.
+**Soft Gate** — 경고로 기록하는 규칙입니다. export는 막지 않고, 결과 해석 시 참고할 수 있게 남깁니다.
 
 | 경고 내용 | 검출 로직 |
 |---------|---------|
@@ -468,14 +423,14 @@ flowchart TD
 
 ### Claim Provenance and Traceability
 
-모든 claim은 `{scope}-{category}-{ordinal}` 형식의 결정론적 ID를 가집니다. 이 ID는 `ClaimBase.model_validator`가 scope / category / ordinal에서 자동 생성하며, 수동 입력 시 포맷 불일치를 `ValueError`로 차단합니다.
+모든 claim은 `{scope}-{category}-{ordinal}` 형식의 결정론적 ID를 사용합니다. 이 ID는 `ClaimBase.model_validator`가 scope / category / ordinal 값을 기준으로 자동 생성하고, 수동 입력 시 포맷이 다르면 `ValueError`를 발생시킵니다.
 
 ```text
 "lges-capex-1"          # LGES capex 관련 첫 번째 claim
 "catl-gross_profit_margin-2"  # CATL gross profit margin 두 번째 claim
 ```
 
-이 ID 체계 덕분에 `SynthesisClaim.supporting_claim_ids` → `AtomicFactClaim` / `MetricFactClaim` → `EvidenceRef` → `DocumentRef` (source_path, page)까지 역추적이 가능합니다.
+이 ID 체계를 사용해 `SynthesisClaim.supporting_claim_ids` → `AtomicFactClaim` / `MetricFactClaim` → `EvidenceRef` → `DocumentRef` (source_path, page) 순서로 근거를 다시 따라갈 수 있게 했습니다.
 
 `ReportSpec.model_validator`는 전체 claim_id 집합에서 중복을 검출해 ValueError를 발생시킵니다.
 
@@ -504,20 +459,7 @@ write_execution_log
   └─ JSONL → logs/app.log
 ```
 
-보고서 생성은 단순 텍스트 출력이 아니라 `state → ReportSpec → rendered artifacts`라는 별도 조립 경로를 거칩니다. `tools.reporting`은 renderer이고, 내용 책임은 `supervisor_synthesis + review + final validation`에 있습니다.
-
----
-
-### Output Ownership Summary
-
-| 산출물 | Owner |
-|-------|-------|
-| Fact extraction (claims, evidence_refs, normalized metrics) | worker agents |
-| Candidate comparison evidence (synthesis_claims, score_criteria, rows) | `comparison` |
-| Executive summary, final judgment, selected tables, supervisor SWOT, score rationale | `supervisor_synthesis` |
-| Submission contract audit | `review` |
-| Markdown / HTML / PDF assembly | `tools.reporting` |
-| Export gate | `tools.validation.validate_final_delivery_state` |
+보고서 생성은 `state → ReportSpec → rendered artifacts` 경로로 조립하도록 구현했습니다. `tools.reporting`은 렌더링을 담당하고, 내용 자체는 `supervisor_synthesis + review + final validation` 단계에서 정리한 결과를 사용합니다.
 
 ---
 
@@ -625,6 +567,9 @@ write_execution_log
 
 ## Setup
 
+<details>
+<summary>설치 및 실행 가이드 펼치기</summary>
+
 ### Requirements
 
 - Python 3.11+
@@ -707,6 +652,8 @@ TOKENIZERS_PARALLELISM=false OMP_NUM_THREADS=1 .venv/bin/python app.py
 .venv/bin/pytest -q
 ```
 
+</details>
+
 ---
 
 ## Outputs
@@ -720,18 +667,6 @@ TOKENIZERS_PARALLELISM=false OMP_NUM_THREADS=1 .venv/bin/python app.py
 
 ---
 
-## Acceptance Coverage
-
-| 범주 | 테스트 | 검증 내용 |
-|-----|--------|---------|
-| Schema / Contract | `test_schema_contracts.py`, `test_comparison_contract.py` | `ReportBlueprint` model_validator, claim scope alignment, `allowed_claim_ids` 경계 |
-| Fact Extraction / Normalization | `test_fact_extraction_agents.py`, `test_normalization.py` | required metric families 충족, NormalizedMetric 변환, derived metric 마킹 |
-| Validator / Review | `test_validation.py`, `test_review_prompt.py`, `test_supervisor.py` | hard gate 규칙 전체, soft gate 탐지 로직, REVIEW_INVALIDATIONS 동작, retry budget 소진 |
-| Reporting / Charting | `test_reporting.py`, `test_charting.py` | ReportSpec → Markdown/HTML 렌더링, trend title 경고 |
-| Workflow / Export E2E | `test_app_e2e.py`, `test_acceptance_suite.py` | 전체 워크플로우 smoke, 제출 기준 acceptance |
-
----
-
 ## Limitations
 
 - 최신 정보 수집보다 공식 문서 기반 근거 일관성에 최적화돼 있습니다. 문서셋 품질이 결과 품질에 직접 영향을 줍니다.
@@ -740,3 +675,5 @@ TOKENIZERS_PARALLELISM=false OMP_NUM_THREADS=1 .venv/bin/python app.py
 - 이 시스템은 전략 검토 보조 도구이며 실제 투자나 사업 의사결정을 대체하지 않습니다.
 
 ---
+
+최신 PDF 보고서: [outputs/report.pdf](./outputs/report.pdf)
