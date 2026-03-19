@@ -39,61 +39,47 @@ LG에너지솔루션(LGES)과 CATL의 포트폴리오 다각화 전략을 근거
 ### Agent Topology
 
 ```mermaid
-graph TD
-    subgraph Supervisor["🧠 Supervisor Layer"]
-        SBP["supervisor_blueprint\n비교 축 4개 고정\nWorker Contract 정의"]
-        SS["supervisor_synthesis\nSWOT · 점수 · 최종판단\nexecutive summary"]
+graph LR
+    subgraph SUP["🧠 Supervisor Layer"]
         SA["supervisor_agent\n라우팅 · 재시도 · 상태관리"]
+        SBP["supervisor_blueprint\n비교 축 4개 고정"]
+        SS["supervisor_synthesis\nSWOT · 점수 · 최종판단"]
     end
 
-    subgraph Workers["⚙️ Worker Layer"]
-        MR["market_research\n시장 배경 fact 추출"]
-        LA["lges_analysis\nLGES fact + metric 추출"]
-        CA["catl_analysis\nCATL fact + metric 추출"]
-        CMP["comparison\ncandidate evidence 합성"]
+    subgraph WORK["⚙️ Worker Layer"]
+        MR["market_research\n시장 배경 fact"]
+        LA["lges_analysis\nLGES fact + metric"]
+        CA["catl_analysis\nCATL fact + metric"]
+        CMP["comparison\nevidence 합성"]
     end
 
     subgraph QA["🔍 QA Layer"]
-        REV["review\n근거 정합성 감리\npass / revision_target"]
-    end
-
-    subgraph Tools["🛠️ Tools"]
-        NORM["normalization\nNormalizedMetric 변환"]
+        REV["review\n근거 정합성 감리"]
         VAL["validation\nhard gate · soft gate"]
-        RPT["reporting\nMarkdown · HTML · PDF"]
-        RET["retrieval\nFAISS scope별 검색"]
+        RPT["reporting\nMD · HTML · PDF"]
     end
 
-    SA -->|"blueprint 없음"| SBP
-    SA -->|"market_context 없음"| MR
-    SA -->|"lges_profile 없음"| LA
-    SA -->|"catl_profile 없음"| CA
-    SA -->|"synthesis_claims 없음"| CMP
-    SA -->|"supervisor sections 없음"| SS
-    SA -->|"review_result 없음"| REV
-    SA -->|"review failed → revision_target"| SA
+    SA -->|"① 비교 축 고정 지시"| SBP
+    SBP -->|"report_blueprint"| SA
 
-    SBP -->|report_blueprint| MR
-    SBP -->|report_blueprint| LA
-    SBP -->|report_blueprint| CA
+    SA -->|"② Worker 실행 지시"| MR
+    SA -->|"② Worker 실행 지시"| LA
+    SA -->|"② Worker 실행 지시"| CA
+    MR -->|"market_facts"| SA
+    LA -->|"lges_facts · metrics"| SA
+    CA -->|"catl_facts · metrics"| SA
 
-    MR -->|market_facts\nmarket_context| CMP
-    LA -->|lges_facts\nlges_profile| CMP
-    CA -->|catl_facts\ncatl_profile| CMP
+    SA -->|"③ 비교 evidence 생성 지시"| CMP
+    CMP -->|"synthesis_claims · rows"| SA
 
-    LA --> NORM
-    CA --> NORM
-    NORM -->|NormalizedMetric| CMP
+    SA -->|"④ 최종 판단 작성 지시"| SS
+    SS -->|"supervisor-owned sections"| SA
 
-    CMP -->|synthesis_claims\nscore_criteria\nmetric_comparison_rows| SS
+    SA -->|"⑤ 감리 요청"| REV
+    REV -->|"passed"| VAL
+    REV -->|"failed → revision_target"| SA
 
-    SS -->|supervisor-owned sections| REV
-    REV -->|review_result| VAL
-    VAL -->|hard gate 통과| RPT
-
-    MR --> RET
-    LA --> RET
-    CA --> RET
+    VAL -->|"hard gate 통과"| RPT
 ```
 
 ---
