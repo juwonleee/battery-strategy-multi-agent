@@ -39,9 +39,10 @@ LG에너지솔루션(LGES)과 CATL의 포트폴리오 다각화 전략을 근거
 ### Agent Topology
 
 ```mermaid
-graph LR
-    subgraph SUP["🧠 Supervisor Layer"]
-        SA["supervisor_agent\n라우팅 · 재시도 · 상태관리"]
+graph TD
+    SA(["🧠 supervisor_agent\n라우팅 · 재시도 · 상태관리"])
+
+    subgraph SUP["Supervisor Layer"]
         SBP["supervisor_blueprint\n비교 축 4개 고정"]
         SS["supervisor_synthesis\nSWOT · 점수 · 최종판단"]
     end
@@ -59,23 +60,19 @@ graph LR
         RPT["reporting\nMD · HTML · PDF"]
     end
 
-    SA -->|"① 비교 축 고정 지시"| SBP
+    SA -->|"① 비교 축 고정"| SBP
     SBP -->|"report_blueprint"| SA
 
-    SA -->|"② Worker 실행 지시"| MR
-    SA -->|"② Worker 실행 지시"| LA
-    SA -->|"② Worker 실행 지시"| CA
-    MR -->|"market_facts"| SA
-    LA -->|"lges_facts · metrics"| SA
-    CA -->|"catl_facts · metrics"| SA
+    SA -->|"② fact 수집"| MR & LA & CA
+    MR & LA & CA -->|"facts · metrics"| SA
 
-    SA -->|"③ 비교 evidence 생성 지시"| CMP
+    SA -->|"③ evidence 합성"| CMP
     CMP -->|"synthesis_claims · rows"| SA
 
-    SA -->|"④ 최종 판단 작성 지시"| SS
+    SA -->|"④ 최종 판단"| SS
     SS -->|"supervisor-owned sections"| SA
 
-    SA -->|"⑤ 감리 요청"| REV
+    SA -->|"⑤ 감리"| REV
     REV -->|"passed"| VAL
     REV -->|"failed → revision_target"| SA
 
@@ -169,38 +166,6 @@ sequenceDiagram
 
 ---
 
-### Supervisor Routing and Governance
-
-`agents/supervisor.py`의 `supervisor_agent()`는 `AgentState`를 읽고 다음 단계를 순차적으로 고릅니다. 먼저 실패 상태와 retry budget을 확인하고, 그다음 `report_blueprint` → 시장 배경 → 기업별 분석 → `comparison` → `supervisor_synthesis` → `review` 순서로 필요한 단계가 비어 있는지 검사합니다. review에서 수정 요청이 나오면 해당 `revision_target`부터 다시 실행하고, 모든 조건이 충족되면 export 단계로 넘어갑니다.
-
----
-
-### REVIEW_INVALIDATIONS: Downstream Field Reset
-
-review가 실패하거나 schema retry가 발생하면, Supervisor는 revision target 이후의 **downstream fields만 선택적으로 초기화**합니다. 예를 들어 `comparison` 단계에서 수정이 필요하면, 그 이후에 만들어진 synthesis와 report 필드를 비우고 앞에서 수집한 market/company fact는 유지합니다. 이런 방식을 사용해 retrieval이나 fact extraction을 처음부터 반복하는 경우를 줄였습니다.
-
-retry budget은 `RetryBudget` 모델로 독립 관리됩니다.
-
-```python
-class RetryBudget(BaseModel):
-    schema_validation_max: int  # worker schema 실패 재시도 한도 (기본 2)
-    review_max: int             # review 실패 revision 한도 (기본 2)
-```
-
-`schema_retry_count`와 `review_retry_count`는 서로 독립적으로 카운트되며, revision이 발생하면 `schema_retry_count`는 0으로 리셋됩니다.
-
----
-
-### SWOT Design Decision
-
-이 보고서는 두 기업을 각각 소개하는 형식보다 `LGES vs CATL 비교 판단`에 맞춰 작성하도록 설계했습니다.
-
-SWOT는 회사별 진단으로 생성하되, 시사점과 종합 판단은 비교 결과를 합성한 `supervisor_synthesis`에서만 도출합니다. 개별 SWOT을 길게 풀어버리면 최종 비교 논리가 흐려지기 때문입니다.
-
-soft gate의 `_add_raw_metric_swot_warning`은 SWOT 항목이 "revenue", "margin", "roe" 같은 raw metric 키워드만 포함하고 전략적 해석 키워드가 없으면 경고를 발생시킵니다.
-
----
-
 ## Data & State
 
 ### State Contract
@@ -264,13 +229,7 @@ flowchart TD
 
 ### Normalization Layer
 
-배터리 기업 비교에서는 성격이 다른 숫자를 같은 표에 넣는 문제가 자주 생깁니다. 이 저장소에서는 이를 줄이기 위해 세 단계 처리를 사용했습니다.
-
-**1단계 — Metric Family 확인**: `LGESFactExtractionOutput` · `CATLFactExtractionOutput`의 `model_validator`가 required metric families를 검증합니다. 이 검증이 실패하면 worker schema 실패로 처리하고 supervisor가 재시도합니다.
-
-**2단계 — NormalizedMetric 생성**: `tools/normalization.py`가 raw `MetricFactClaim`을 받아 `basis` (`guidance` vs `reported`) · `period` · `unit`을 보존한 채 `NormalizedMetric`으로 변환합니다. CATL의 `net_profit_margin`이 원문에서 직접 추출 불가한 경우 `revenue`와 `profit_for_the_year`에서 파생하며 `is_derived=True`로 마킹합니다.
-
-**3단계 — Comparability 분류**: `MetricComparisonRow.comparability_status`를 `direct` / `reference_only` / `reject`로 분류합니다. `direct`만 비교표에 넣고, `reference_only`는 별도 표로 분리했습니다. 서로 다른 회계 기준이나 공개 범위 차이가 있는 수치를 같은 표에 바로 섞지 않기 위한 처리입니다.
+회계 기준이나 공개 범위가 다른 수치를 직접 비교하지 않도록, 정량 지표는 `basis` · `period` · `unit`을 보존한 채 정규화하고 `direct` / `reference_only` / `reject`로 비교 가능성을 분류합니다. `direct`만 비교표에 포함됩니다. 상세 처리 로직은 [design.md](./docs/design.md)를 참고하세요.
 
 ---
 
@@ -312,31 +271,6 @@ flowchart TD
 모든 claim은 `{scope}-{category}-{ordinal}` 형식의 ID를 사용합니다. 이 ID를 기준으로 synthesis claim에서 fact claim, evidence, 원문 문서 위치까지 다시 따라갈 수 있게 구성했습니다. 최종 판단을 문서 근거와 연결해 설명하려는 목적에 맞춘 설계였습니다.
 
 ---
-
-### Report Assembly Pipeline
-
-```text
-supervisor_synthesis
-  └─ supervisor-owned state fields 생성
-
-tools.reporting.build_report_spec
-  └─ state → ReportSpec (제출 계약 객체 조립)
-
-review agent
-  └─ ReportSpec 전체 감리 → ReviewResult
-
-validate_final_delivery_state     ← hard gate
-  └─ hard_errors → export 차단
-  └─ soft_warnings → validation_warnings에 기록
-
-assemble_markdown_report
-assemble_html_report               ← Playwright PDF
-
-write_execution_log
-  └─ JSONL → logs/app.log
-```
-
-보고서 생성은 `state → ReportSpec → rendered artifacts` 경로로 조립하도록 구현했습니다. `tools.reporting`은 렌더링을 담당하고, 내용 자체는 `supervisor_synthesis + review + final validation` 단계에서 정리한 결과를 사용합니다.
 
 ---
 
